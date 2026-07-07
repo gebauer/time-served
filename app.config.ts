@@ -31,6 +31,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     // J4 adds `./plugins/nfc`, J5 adds `./plugins/fgs` here.
+    './plugins/nfc',
   ],
 };
 

@@ -8,7 +8,12 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   test: {
-    include: ['src/domain/**/*.test.ts', 'src/data/**/*.test.ts'],
+    include: [
+      'src/domain/**/*.test.ts',
+      'src/data/**/*.test.ts',
+      // J4: pure NDEF codec + fakes tests — no native modules, plain Node.
+      'src/platform/**/*.test.ts',
+    ],
     environment: 'node',
   },
 });
