@@ -84,4 +84,4 @@ listener + FGS receiver) and normalizes per subscription
 
 No signature change — behavioral clarification only. Affects J9 (consumes the stream;
 may map events 1:1 onto domain events without extra dedupe) and the iOS adapter later
-(should follow the same rules).
+(should follow the same rules). **Accepted** (coordinator, 2026-07-07).
