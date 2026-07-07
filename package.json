@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@noble/ciphers": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
     "@nozbe/watermelondb": "^0.28.0",
     "expo": "~57.0.2",
     "expo-battery": "~57.0.0",
