@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@nozbe/watermelondb':
+        specifier: ^0.28.0
+        version: 0.28.0
       expo:
         specifier: ~57.0.2
         version: 57.0.2(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      expo-secure-store:
+        specifier: ^57.0.0
+        version: 57.0.0(expo@57.0.2)
       expo-status-bar:
         specifier: ~57.0.0
         version: 57.0.0(expo@57.0.2)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)
@@ -371,6 +377,10 @@ packages:
     engines: {node: '>=6.9.0'}
     peerDependencies:
       '@babel/core': ^7.0.0-0
+
+  '@babel/runtime@7.26.0':
+    resolution: {integrity: sha512-FDSOghenHTiToteC/QRlv2q3DhPZ/oOXTBoirfWNx1Cx3TMVcGWQtMMmQcSvb/JjpNeGzx8Pq/b4fKEJuWm1sw==}
+    engines: {node: '>=6.9.0'}
 
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
@@ -807,6 +817,19 @@ packages:
   '@nolyfill/is-core-module@1.0.39':
     resolution: {integrity: sha512-nn5ozdjYQpUCZlWGuxcJY/KpxkWQs4DcbMCmKojjyrYDEAGy4Ce19NN4v5MduafTwJlbKc99UA8YhSVqq9yPZA==}
     engines: {node: '>=12.4.0'}
+
+  '@nozbe/lokijs@1.5.12-wmelon6':
+    resolution: {integrity: sha512-GXsaqY8qTJ6xdCrGyno2t+ON2aj6PrUDdvhbrkxK/0Fp12C4FGvDg1wS+voLU9BANYHEnr7KRWfItDZnQkjoAg==}
+
+  '@nozbe/simdjson@3.9.4':
+    resolution: {integrity: sha512-/3oCP8GBpdyeiBMEnuI6S0yl0yekD6Qxfed67hZqU1GIVn3o/vZgE8qANm69THfw7JgHLS9zjx56F/dO3q+koA==}
+
+  '@nozbe/sqlite@3.46.0':
+    resolution: {integrity: sha512-ntt8eNp5hh+axX9+kFb5uwyVE0edyfhiYYr+zHDzzFleGC7Qm+a2wHDWDtmRr5nSfbgomhY1uh30kpsHEIR3Mw==}
+
+  '@nozbe/watermelondb@0.28.0':
+    resolution: {integrity: sha512-40ttcqPOLCTGnbfCQAXSEo8J4KlH/QQhwTfTb9E21CyX/driMEZueiJSI2rSkHICZrI2vnu52aRubNbI3UAzQQ==}
+    engines: {node: '>=18'}
 
   '@react-native/assets-registry@0.86.0':
     resolution: {integrity: sha512-nIaXbm2jX1OTYp0qbviJ3O6KZivoE8z3BnhUQ2LsqfZSWRoOK/n1qsiAr6oALiNKWnXY3j2KPwtYORnZzp8xew==}
@@ -1954,6 +1977,11 @@ packages:
     peerDependencies:
       react-native: '*'
 
+  expo-secure-store@57.0.0:
+    resolution: {integrity: sha512-vkP16rhW7b4bljW5BC4kKXBpNxQ0O1E9SpI5NIfh2biZnszLTpI/gUF4oBsvOY2nvkh7oXS2ERuUoA8cuS8FWQ==}
+    peerDependencies:
+      expo: '*'
+
   expo-server@57.0.0:
     resolution: {integrity: sha512-18byjwFbHVFrGzI4IH1o2MZiiYwvO/y3d+JL3sq50Lg3Id1titwIRMh1fjbHbpM+wP6x14KJY0Ers1UYsjGq8Q==}
     engines: {node: '>=20.16.0'}
@@ -2181,6 +2209,9 @@ packages:
 
   hermes-parser@0.36.1:
     resolution: {integrity: sha512-GApNk4zLHi2UWoWZZkx7LNCOSzLSc5lB55pZ/PhK7ycFeg7u5LcF88p/WbpIi1XUDtE0MpHE3uRR3u3KB7TjSQ==}
+
+  hoist-non-react-statics@3.3.2:
+    resolution: {integrity: sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==}
 
   hosted-git-info@7.0.2:
     resolution: {integrity: sha512-puUZAUKT5m8Zzvs72XWy3HtvVbTWljRE66cP60bxJzAqf2DgICo7lYTY2IHUmLnNpjYvw5bvmoHvPc0QO2a62w==}
@@ -2944,6 +2975,9 @@ packages:
   regenerator-runtime@0.13.11:
     resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
 
+  regenerator-runtime@0.14.1:
+    resolution: {integrity: sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw==}
+
   regexp.prototype.flags@1.5.4:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
@@ -2995,6 +3029,9 @@ packages:
     resolution: {integrity: sha512-RFnrW4lhXA3s3eqHDZvN654g8OTjzRfqpIRJYczCGB6HzphckVAi/Qh4tbPUbRuDi7s1Llv8g/NspLkttY3gTA==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  rxjs@7.8.2:
+    resolution: {integrity: sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==}
 
   safe-array-concat@1.1.4:
     resolution: {integrity: sha512-wtZlHyOje6OZTGqAoaDKxFkgRtkF9CnHAVnCHKfuj200wAgL+bSJhdsCD2l0Qx/2ekEXjPWcyKkfGb5CPboslg==}
@@ -3112,6 +3149,9 @@ packages:
   source-map@0.6.1:
     resolution: {integrity: sha512-UjgapumWlbMhkBgzT7Ykc5YXUT46F0iKu8SGXq0bcwP5dz/h0Plj6enJqjz1Zbq2l5WaqYnrVbwWOWMyF3F47g==}
     engines: {node: '>=0.10.0'}
+
+  sql-escape-string@1.1.0:
+    resolution: {integrity: sha512-/kqO4pLZSLfV0KsBM2xkVh2S3GbjJJone37d7gYwLyP0c+REh3vnmkhQ7VwNrX76igC0OhJWpTg0ukkdef9vvA==}
 
   stable-hash@0.0.5:
     resolution: {integrity: sha512-+L3ccpzibovGXFK+Ap/f8LOS0ahMrHTf3xu7mMLSpEGU0EO9ucaysSylKo9eRDFNhWve/y275iPmIZ4z39a9iA==}
@@ -3979,6 +4019,10 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@babel/runtime@7.26.0':
+    dependencies:
+      regenerator-runtime: 0.14.1
+
   '@babel/runtime@7.29.7': {}
 
   '@babel/template@7.29.7':
@@ -4553,6 +4597,22 @@ snapshots:
     optional: true
 
   '@nolyfill/is-core-module@1.0.39': {}
+
+  '@nozbe/lokijs@1.5.12-wmelon6': {}
+
+  '@nozbe/simdjson@3.9.4': {}
+
+  '@nozbe/sqlite@3.46.0': {}
+
+  '@nozbe/watermelondb@0.28.0':
+    dependencies:
+      '@babel/runtime': 7.26.0
+      '@nozbe/simdjson': 3.9.4
+      '@nozbe/sqlite': 3.46.0
+      hoist-non-react-statics: 3.3.2
+      lokijs: '@nozbe/lokijs@1.5.12-wmelon6'
+      rxjs: 7.8.2
+      sql-escape-string: 1.1.0
 
   '@react-native/assets-registry@0.86.0': {}
 
@@ -5868,6 +5928,10 @@ snapshots:
     dependencies:
       react-native: 0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3)
 
+  expo-secure-store@57.0.0(expo@57.0.2):
+    dependencies:
+      expo: 57.0.2(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+
   expo-server@57.0.0: {}
 
   expo-status-bar@57.0.0(expo@57.0.2)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3):
@@ -6098,6 +6162,10 @@ snapshots:
   hermes-parser@0.36.1:
     dependencies:
       hermes-estree: 0.36.1
+
+  hoist-non-react-statics@3.3.2:
+    dependencies:
+      react-is: 16.13.1
 
   hosted-git-info@7.0.2:
     dependencies:
@@ -6965,6 +7033,8 @@ snapshots:
 
   regenerator-runtime@0.13.11: {}
 
+  regenerator-runtime@0.14.1: {}
+
   regexp.prototype.flags@1.5.4:
     dependencies:
       call-bind: 1.0.9
@@ -7050,6 +7120,10 @@ snapshots:
       '@rollup/rollup-win32-x64-gnu': 4.62.2
       '@rollup/rollup-win32-x64-msvc': 4.62.2
       fsevents: 2.3.3
+
+  rxjs@7.8.2:
+    dependencies:
+      tslib: 2.8.1
 
   safe-array-concat@1.1.4:
     dependencies:
@@ -7193,6 +7267,8 @@ snapshots:
   source-map@0.5.7: {}
 
   source-map@0.6.1: {}
+
+  sql-escape-string@1.1.0: {}
 
   stable-hash@0.0.5: {}
 
@@ -7355,8 +7431,7 @@ snapshots:
       minimist: 1.2.8
       strip-bom: 3.0.0
 
-  tslib@2.8.1:
-    optional: true
+  tslib@2.8.1: {}
 
   type-check@0.4.0:
     dependencies:

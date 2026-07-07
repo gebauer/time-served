@@ -48,3 +48,15 @@ XChaCha20-Poly1305 (libsodium secretbox-xchacha20poly1305), fresh random 24-byte
 **prepended** to the ciphertext, **no additional data**; the whole `nonce || ct` blob is
 base64-encoded (`Sealed` type). Applies to `enc_group_meta` and `enc_nick`. Affects J6
 (implements) and J7 (treats the values as opaque strings).
+
+### #6 — 2026-07-07 — PROPOSAL (J3): `DayBucketRepository.markDirty` creates missing buckets
+
+The contract doesn't say what `markDirty(dates)` does for a date that has no
+`day_buckets` row yet (possible when a session close/edit touches a day before
+its first recompute). J3's WatermelonDB implementation **creates a zeroed
+bucket (`day_lock_sec=0, night_lock_sec=0, dirty=true, sealed_at=null`)** for
+such dates, so `findDirty()` reliably feeds every touched day into the next
+recompute. No signature change — behavioral clarification only. Affects J2
+(recompute may see zeroed dirty buckets it hasn't computed yet — it overwrites
+them via `upsert` anyway) and J10 (none expected). **Accepted** (coordinator,
+2026-07-07): this is the desired semantic.
