@@ -85,7 +85,6 @@ listener + FGS receiver) and normalizes per subscription
 No signature change — behavioral clarification only. Affects J9 (consumes the stream;
 may map events 1:1 onto domain events without extra dedupe) and the iOS adapter later
 (should follow the same rules). **Accepted** (coordinator, 2026-07-07).
-<<<<<<< HEAD
 ### #8 — 2026-07-07 — PROPOSAL (J6): noble crypto libs instead of libsodium
 
 JOBS.md J6 suggests libsodium (`libsodium-wrappers` / `react-native-libsodium`).
@@ -130,3 +129,35 @@ ONE file — `src/app/services.ts` — which is the designated swap surface:
 
 Affects J9/J10 (implement against these seams), no other jobs. **Accepted**
 (coordinator, 2026-07-07).
+
+### #10 — 2026-07-07 — PROPOSAL (J10): additional sync-side secure-store entries
+
+The `DeviceCredentialStore` contract stores `{userId, token}` — but the device-auth
+flow (server/README.md §3) also needs the client-generated `user_uuid` and the random
+password to re-authenticate when the token expires. Instead of changing the contract,
+J10 adds ADDITIVE entries in the same `SecureKeyValueStore` namespace:
+
+- `ts.sync.identity`   JSON `{userUuid, password}` — written BEFORE the first network
+  call so a crashed/offline bootstrap retries with the same identity.
+- `ts.sync.sealfill`   `YYYY-MM-DD` watermark: latest date through which the seal
+  scheduler has zero-filled gap days (`ensureZeroBuckets`).
+- `ts.sync.groupmeta`  JSON `Record<groupId, {name, role, consented, myNickname,
+  memberCount}>` — local snapshot of DECRYPTED group meta so `GroupsGateway.list()`
+  works offline. Sensitive (plaintext names), hence secure store, never synced.
+
+No interface signature changes; `DeviceCredentialStore` keeps its shape. Affects
+nobody else (keys live in J10's `ts.sync.*` prefix; J3's stores use `ts.credential` /
+`ts.groupkey.*` / `ts.groupkeys`).
+
+### #11 — 2026-07-07 — J10 decision: foreground-only seal triggers in V1
+
+JOBS.md J10 suggests WorkManager via `expo-background-task` for the ~12:00 daily seal.
+V1 ships FOREGROUND-ONLY triggers instead (`src/app/sync/sealTriggers.ts`): app
+launch + AppState→active + a wall-clock timer that fires if the seal hour passes
+while the app is open. Rationale: sealing is lazy and idempotent by design (BUILD_V1
+§5 — a day only needs to upload *eventually*), the pipeline recovers duplicates via
+the server's unique index, and a WorkManager task is itself OS-discretionary on
+aggressive OEMs, so the added native module + config plugin buys little. Sync-off
+semantics clarified with it: sealed means UPLOADED — with the sync toggle off nothing
+is sealed locally either; past days stay editable until sync is re-enabled (Settings
+copy updated accordingly). Revisit in J11 if background sealing becomes a requirement.

@@ -15,8 +15,10 @@
  * InMemorySecureStore → ExpoSecureKeyValueStore, the fakes → AndroidTagReader/
  * AndroidTagWriter/AndroidPowerStateProvider/AndroidSessionRuntime, and revisit
  * the provisional tag/ARM_TIMEOUT wiring in wiring.ts.
- * J10 (sync): swap createStubGroupsGateway → the PocketBase gateway (J6 crypto).
- * Everything else (engine, hooks, screens, wiring helpers) stays untouched.
+ * J10 (sync, DONE): the groups/sync section below swaps in the PocketBase
+ * gateway + device auth + seal scheduler when EXPO_PUBLIC_POCKETBASE_URL is
+ * configured (src/app/sync/); otherwise the stub gateway keeps the offline
+ * dev harness working. Everything else stays untouched.
  */
 import { createRepositories, InMemorySecureStore, seedDemoData } from '../data';
 import { createTestDatabase } from '../data/testing';
@@ -33,10 +35,22 @@ import type {
   AppServices,
   DevControls,
   DevTagKind,
+  GroupsGateway,
   OnboardingStore,
 } from '../ui/services/AppServicesContext';
+import { createGroupCrypto, inviteLinkCodec } from '../domain/crypto';
 import { createSettingsStore, deviceTimeZone } from './settingsStore';
 import { createStubGroupsGateway } from './stubGroups';
+// --- J10 sync imports (groups/sync wiring section below) ---
+import {
+  createDailyStatUploader,
+  createDeviceAuth,
+  createPocketBaseClient,
+  createPocketBaseGroupsGateway,
+  createSealScheduler,
+  loadSyncConfig,
+} from './sync';
+import { attachSealTriggers } from './sync/sealTriggers';
 import {
   createChangeNotifier,
   createEngineHandle,
@@ -102,7 +116,53 @@ export async function createAppServices(): Promise<AppServices> {
   });
   await tagReader.start();
 
-  const groups = createStubGroupsGateway({ repositories, clock, ids, timeZone });
+  // ==========================================================================
+  // >>> J10 — groups/sync wiring (src/app/sync/). With a configured server
+  // (EXPO_PUBLIC_POCKETBASE_URL) this runs the REAL PocketBase gateway (J6
+  // crypto + J7 routes) plus device auth and the daily seal pipeline; without
+  // one, the stub gateway keeps the dev harness fully usable offline. <<<
+  // ==========================================================================
+  const syncConfig = loadSyncConfig();
+  let groups: GroupsGateway;
+  if (syncConfig.serverUrl !== undefined) {
+    const pbClient = createPocketBaseClient(syncConfig.serverUrl);
+    const deviceAuth = createDeviceAuth({
+      client: pbClient,
+      kv: secureStore,
+      credentials: repositories.deviceCredential,
+    });
+    groups = createPocketBaseGroupsGateway({
+      client: pbClient,
+      auth: deviceAuth,
+      crypto: createGroupCrypto(),
+      codec: inviteLinkCodec,
+      groupKeys: repositories.groupKeys,
+      kv: secureStore,
+      clock,
+      timeZone: () => timeZone,
+      inviteHost: syncConfig.inviteHost,
+    });
+    const sealScheduler = createSealScheduler({
+      dayBuckets: repositories.dayBuckets,
+      kv: secureStore,
+      clock,
+      timeZone: () => timeZone,
+      syncEnabled: () => settings.get().syncEnabled,
+      getUserId: async () => (await deviceAuth.ensureAuthed()).userId,
+      upload: createDailyStatUploader(pbClient, deviceAuth),
+    });
+    // Foreground-only triggers (launch / AppState active / midday timer) —
+    // V1 decision documented in sealTriggers.ts. Lives for the app lifetime.
+    attachSealTriggers({
+      runOnce: () => sealScheduler.runOnce(),
+      clock,
+      timeZone: () => timeZone,
+      sealHourLocal: () => settings.get().sealHourLocal,
+    });
+  } else {
+    groups = createStubGroupsGateway({ repositories, clock, ids, timeZone });
+  }
+  // ======================= <<< end J10 groups/sync >>> ======================
 
   const onboarding: OnboardingStore = {
     async isDone() {

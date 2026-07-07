@@ -186,7 +186,8 @@ export const strings = {
     batteryOptLabel: 'Akku-Optimierung',
     batteryOptUnknown: 'Status unbekannt (wird in der App-Fertigstellung geprüft)',
     syncLabel: 'Synchronisierung',
-    syncHint: 'Lädt versiegelte Tages-Summen für deine Gruppen hoch.',
+    syncHint:
+      'Lädt versiegelte Tages-Summen für deine Gruppen hoch. Ausgeschaltet wird nichts hochgeladen; vergangene Tage bleiben unversiegelt und bearbeitbar.',
     identityHeading: 'Anonyme Identität',
     identityBlurb:
       'Dein Konto ist eine zufällige ID ohne Bezug zu deinem Gerät oder Namen. Der Server sieht nur versiegelte Tages-Summen; Gruppennamen und Nicknames sind Ende-zu-Ende-verschlüsselt.',

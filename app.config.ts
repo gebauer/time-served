@@ -24,6 +24,16 @@ const config: ExpoConfig = {
       monochromeImage: './assets/android-icon-monochrome.png',
     },
     predictiveBackGestureEnabled: false,
+    // J10: https invite links (`https://timeserved.app/j#…`) offer the app in
+    // the Android chooser. Unverified (no assetlinks.json yet — J11 hardening
+    // can add autoVerify); the timeserved:// scheme works regardless.
+    intentFilters: [
+      {
+        action: 'VIEW',
+        category: ['BROWSABLE', 'DEFAULT'],
+        data: [{ scheme: 'https', host: 'timeserved.app', pathPrefix: '/j' }],
+      },
+    ],
   },
   ios: {
     // iOS is a later adapter swap (BUILD_V1 §13); config kept minimal but valid.

@@ -5,9 +5,10 @@
  * plus root-stack flows (Box-Wizard, Gruppe erstellen/beitreten, Rangliste,
  * Dev-Harness).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Text, useColorScheme, View } from 'react-native';
 import {
+  createNavigationContainerRef,
   DarkTheme,
   DefaultTheme,
   NavigationContainer,
@@ -36,9 +37,12 @@ import {
 import { strings } from '../ui/strings';
 import { darkPalette, lightPalette } from '../ui/theme';
 import { createAppServices } from './services';
+// J10: invite deep links (timeserved:// + https universal links) → GroupJoin.
+import { attachInviteDeepLinks } from './sync/inviteDeepLink';
 
 const Tab = createBottomTabNavigator<TabsParamList>();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 export default function App() {
   const [services, setServices] = useState<AppServices | undefined>(undefined);
@@ -53,6 +57,24 @@ export default function App() {
       setServices(created);
     });
   }, []);
+
+  // J10: route invite links to the GroupJoin screen. Links arriving before
+  // navigation is ready (cold start, onboarding) are parked and flushed via
+  // the container's onReady below.
+  const pendingInviteRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (services === undefined) return;
+    return attachInviteDeepLinks({
+      parseInvite: (url) => services.groups.parseInvite(url),
+      onInvite: (inviteUrl) => {
+        if (navigationRef.isReady()) {
+          navigationRef.navigate('GroupJoin', { inviteUrl });
+        } else {
+          pendingInviteRef.current = inviteUrl;
+        }
+      },
+    });
+  }, [services]);
 
   const navigationTheme: NavigationTheme = useMemo(() => {
     const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
@@ -90,7 +112,17 @@ export default function App() {
     <AppServicesContext.Provider value={services}>
       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
       {onboarded ? (
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer
+          ref={navigationRef}
+          theme={navigationTheme}
+          onReady={() => {
+            const inviteUrl = pendingInviteRef.current;
+            if (inviteUrl !== undefined) {
+              pendingInviteRef.current = undefined;
+              navigationRef.navigate('GroupJoin', { inviteUrl });
+            }
+          }}
+        >
           <RootStack />
         </NavigationContainer>
       ) : (
