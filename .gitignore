@@ -182,3 +182,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Claude agent worktrees
+.claude/worktrees/

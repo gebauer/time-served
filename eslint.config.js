@@ -5,8 +5,9 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    // server/ is PocketBase JS (its own runtime globals; J7 owns its checks)
-    ignores: ['dist/*', 'android/*', 'ios/*', 'server/**', '.expo/*'],
+    // server/ is PocketBase JS (its own runtime globals; J7 owns its checks);
+    // .claude/worktrees holds agent worktree checkouts, never lint them here
+    ignores: ['dist/*', 'android/*', 'ios/*', 'server/**', '.expo/*', '.claude/**'],
   },
   {
     // CLAUDE.md §6/§10: domain and ui never import native APIs. Enforced
