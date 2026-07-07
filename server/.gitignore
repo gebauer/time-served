@@ -1,0 +1,6 @@
+# PocketBase binary (downloaded by test.sh) + local data
+pocketbase
+pb.zip
+pb_data/
+.tmp-types/
+*.log

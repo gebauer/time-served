@@ -47,6 +47,10 @@ Out (later versions):
 - **Measurement numbers are plaintext on the server.** Justified by their low resolution:
   per user, per day, only two integers (day/night seconds), no timestamps, no box, no
   location. The user is told at sync time that these numbers are uploaded.
+- **A session left open across multiple days loses its earlier days.** Sealing (§5) runs at
+  midday for every past day regardless of open sessions, and buckets recompute only on
+  session close/edit — so a phone that stays boxed for days has those days sealed as zero
+  before the session closes. Accepted; see docs/CONTRACT_CHANGES.md #1.
 - **Security target is "hard, not bulletproof."** Goal: an outsider without the invite link
   cannot enumerate groups, cannot learn group names or nicknames, cannot tie a `user_id` to a
   person. It is acceptable that a leaked link exposes that group's name layer.

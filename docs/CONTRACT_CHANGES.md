@@ -1,0 +1,50 @@
+# CONTRACT_CHANGES.md
+
+Process (JOBS.md): shared contracts are `src/domain/types.ts`, the interface files in
+`src/platform/` and `src/data/Repositories.ts`, `src/domain/crypto/CryptoPorts.ts`, and the
+server route contracts in `server/README.md`. **No job may change a contract silently.**
+Any change gets an entry here — date, what changed, why, and which jobs are affected — and
+the affected jobs' owners must be able to re-read this file and adapt. Additive changes are
+preferred; breaking changes need explicit sign-off from the project owner.
+
+---
+
+## Decisions log
+
+### #1 — 2026-07-07 — Multi-day open sessions lose sealed days (accepted limitation)
+
+BUILD_V1 §5 seals every past day at midday, and bucket recompute runs only on session
+close/edit. A session left open across several days (phone stays in the box) therefore has
+its earlier days sealed as 0 before it closes; that time is lost because sealed days are
+immutable. **Decision (project owner): accept and document — do not engineer around it.**
+Listed in BUILD_V1 §3 as an accepted limitation. Affects J2 (no special-casing needed) and
+J10 (seal task seals unconditionally).
+
+### #2 — 2026-07-07 — Group create/join go through JS-hook endpoints
+
+BUILD_V1 §10.5 could be read as direct collection creates. Decision: `groups` and
+`memberships` are written only via custom PocketBase hook routes (`/api/ts/group-create`,
+`/api/ts/group-join`, `/api/ts/group-leave`), consistent with the `group-feed` read hook.
+Collection API rules stay uniformly `false` except `daily_stats` create-by-owner.
+Affects J7 (implements the routes) and J10 (calls them). Route contracts: `server/README.md`.
+
+### #5 — 2026-07-07 — k_auth transport & auth_hash encoding (set by J7)
+
+`k_auth` travels as **base64url without padding**; `auth_hash` = **lowercase hex SHA-256
+over that base64url string itself** (64 chars), because PocketBase's JSVM hashes strings.
+J6's `authHash()` must reproduce this exactly. Details: server/README.md §2.
+
+### #4 — 2026-07-07 — user_id on the wire is the PocketBase record id (set by J7)
+
+Client UUIDs don't fit PocketBase 15-char record ids. `users.user_uuid` / `groups.group_uuid`
+hold the client UUIDs; `/api/ts/*` routes speak `group_id` = client UUID, but `user_id` in
+feeds and `daily_stats` is the **15-char PB record id**, learned from the auth response. The
+domain `UserId` brand therefore carries the PB record id at runtime (still random — privacy
+unaffected). Affects J10 (sync) and scoring inputs. Details: server/README.md §1.
+
+### #3 — 2026-07-07 — AEAD convention
+
+XChaCha20-Poly1305 (libsodium secretbox-xchacha20poly1305), fresh random 24-byte nonce
+**prepended** to the ciphertext, **no additional data**; the whole `nonce || ct` blob is
+base64-encoded (`Sealed` type). Applies to `enc_group_meta` and `enc_nick`. Affects J6
+(implements) and J7 (treats the values as opaque strings).

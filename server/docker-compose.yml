@@ -1,0 +1,28 @@
+# Time Served backend — single PocketBase service.
+# Coolify: point a "Docker Compose" resource at server/ in this repo, set the
+# two env vars, attach your domain to port 8090. Migrations and hooks are
+# baked into the image and applied automatically on start.
+services:
+  pocketbase:
+    build:
+      context: .
+      args:
+        PB_VERSION: "0.39.5"
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      # Dashboard superuser, created/updated on every start.
+      PB_ADMIN_EMAIL: ${PB_ADMIN_EMAIL:-}
+      PB_ADMIN_PASSWORD: ${PB_ADMIN_PASSWORD:-}
+    volumes:
+      - pb_data:/pb/pb_data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8090/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  pb_data:
