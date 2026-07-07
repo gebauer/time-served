@@ -14,6 +14,9 @@ importers:
       expo:
         specifier: ~57.0.2
         version: 57.0.2(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      expo-battery:
+        specifier: ~57.0.0
+        version: 57.0.0(expo@57.0.2)(react@19.2.3)
       expo-secure-store:
         specifier: ^57.0.0
         version: 57.0.0(expo@57.0.2)
@@ -1932,6 +1935,12 @@ packages:
       expo: '*'
       react: '*'
       react-native: '*'
+
+  expo-battery@57.0.0:
+    resolution: {integrity: sha512-1BHRrElHnUenf21uk8A3nZ2nSreBpMRj7KMOcL9mpuUfYh4odqTpktnOPdbELsdj6Chiyg1f+oiJz3iG2aSXHg==}
+    peerDependencies:
+      expo: '*'
+      react: '*'
 
   expo-constants@57.0.3:
     resolution: {integrity: sha512-BghbZlzwFnA22BG0CWv6W29zx8w19FozYPfSeZ3HjMitoy4aAmF1FnFbbjYSmZz6HHXXTWOfqwobOEIaglfzxg==}
@@ -5880,6 +5889,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
       - typescript
+
+  expo-battery@57.0.0(expo@57.0.2)(react@19.2.3):
+    dependencies:
+      expo: 57.0.2(@babel/core@7.29.7)(@expo/dom-webview@57.0.0)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+      react: 19.2.3
 
   expo-constants@57.0.3(expo@57.0.2)(react-native@0.86.0(@babel/core@7.29.7)(@types/react@19.2.17)(react@19.2.3)):
     dependencies:

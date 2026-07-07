@@ -30,7 +30,8 @@ const config: ExpoConfig = {
     supportsTablet: false,
   },
   plugins: [
-    // J4 adds `./plugins/nfc`, J5 adds `./plugins/fgs` here.
+    // J4 adds `./plugins/nfc` here.
+    './plugins/fgs',
   ],
 };
 

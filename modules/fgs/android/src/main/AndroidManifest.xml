@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Intentionally (almost) empty. The <service> entry, the FGS permissions and the
+  POST_NOTIFICATIONS permission are injected into the APP manifest by the config
+  plugin in plugins/fgs (BUILD_V1 §8.4).
+
+  There is deliberately NO <receiver> here and there never may be one:
+  ACTION_POWER_DISCONNECTED / ACTION_BATTERY_CHANGED are registered DYNAMICALLY
+  inside TimeServedFgsService (CLAUDE.md §4 — manifest-declared implicit power
+  receivers are unreliable on Android 8+).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
