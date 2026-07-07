@@ -60,3 +60,25 @@ recompute. No signature change — behavioral clarification only. Affects J2
 (recompute may see zeroed dirty buckets it hasn't computed yet — it overwrites
 them via `upsert` anyway) and J10 (none expected). **Accepted** (coordinator,
 2026-07-07): this is the desired semantic.
+
+### #7 — 2026-07-07 — PROPOSAL (J6): noble crypto libs instead of libsodium
+
+JOBS.md J6 suggests libsodium (`libsodium-wrappers` / `react-native-libsodium`).
+`libsodium-wrappers` is WASM-based and does **not** run on React Native Hermes;
+`react-native-libsodium` is a native module and therefore forbidden in `src/domain/`
+(CLAUDE.md §6 — the lint config enforces it, and domain tests must run on plain Node).
+J6 instead uses the audited pure-JS **`@noble/hashes` 2.2.0** (SHA-256, HKDF) and
+**`@noble/ciphers` 2.2.0** (XChaCha20-Poly1305), which run identically on Node and
+Hermes with no native code.
+
+No wire-format change: HKDF-SHA256 (RFC 5869) and XChaCha20-Poly1305
+(draft-irtf-cfrg-xchacha, == libsodium `crypto_aead_xchacha20poly1305_ietf`) are
+standard constructions, so decisions #3 and #5 are implemented byte-identically —
+ciphertexts and `auth_hash` stay compatible with any future libsodium implementation
+(e.g. a native iOS one). Interop is pinned by test vectors in
+`src/domain/crypto/crypto.test.ts` (IETF draft AEAD vector, RFC 5869 vectors, and an
+independent `node:crypto` cross-check of the full K_g → auth_hash chain); wire formats
+are documented in `src/domain/crypto/README.md`. Affects J9/J10 only in one way: the
+default RNG is `crypto.getRandomValues`, so the app must import
+`react-native-get-random-values` at bootstrap before any crypto call (J6's
+`defaultRandomBytes` fails loudly if it's missing).
