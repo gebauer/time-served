@@ -30,6 +30,7 @@ import { HomeScreen } from '../ui/screens/HomeScreen';
 import { LeaderboardScreen } from '../ui/screens/LeaderboardScreen';
 import { OnboardingScreen } from '../ui/screens/OnboardingScreen';
 import { SettingsScreen } from '../ui/screens/SettingsScreen';
+import { ToastProvider } from '../ui/components/Toast';
 import {
   AppServicesContext,
   type AppServices,
@@ -119,32 +120,32 @@ export default function App() {
 
   return (
     <AppServicesContext.Provider value={services}>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-      {onboarded ? (
-        <NavigationContainer
-          ref={navigationRef}
-          theme={navigationTheme}
-          onReady={() => {
-            const inviteUrl = pendingInviteRef.current;
-            if (inviteUrl !== undefined) {
-              pendingInviteRef.current = undefined;
-              navigationRef.navigate('GroupJoin', { inviteUrl });
-            }
-          }}
-        >
-          <RootStack />
-        </NavigationContainer>
-      ) : (
-        <OnboardingScreen
-          onDone={() => {
-            void services.onboarding.markDone();
-            setOnboarded(true);
-          }}
-          // J11 wires the real permission requests.
-          onRequestNotifications={() => {}}
-          onRequestBatteryExemption={() => {}}
-        />
-      )}
+      {/* J11: app-wide snackbar for async failures (honest German copy). */}
+      <ToastProvider>
+        <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+        {onboarded ? (
+          <NavigationContainer
+            ref={navigationRef}
+            theme={navigationTheme}
+            onReady={() => {
+              const inviteUrl = pendingInviteRef.current;
+              if (inviteUrl !== undefined) {
+                pendingInviteRef.current = undefined;
+                navigationRef.navigate('GroupJoin', { inviteUrl });
+              }
+            }}
+          >
+            <RootStack />
+          </NavigationContainer>
+        ) : (
+          <OnboardingScreen
+            onDone={() => {
+              void services.onboarding.markDone();
+              setOnboarded(true);
+            }}
+          />
+        )}
+      </ToastProvider>
     </AppServicesContext.Provider>
   );
 }

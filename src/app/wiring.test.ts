@@ -139,6 +139,37 @@ describe('createTagPayloadHandler', () => {
     await handle({ boxUuid: other, label: '', version: 1 });
     expect(repos.boxes.rows.get(other as BoxId)?.label).toBe(UNKNOWN_BOX_LABEL);
   });
+
+  it('fires onForeignBoxCreated for auto-created boxes only, and never lets it break TAG_READ', async () => {
+    const clock = new FakeClock(1_000 as EpochMs);
+    const repos = makeInMemoryRepositories(clock);
+    const stub = makeEngineStub();
+    const notified: string[] = [];
+    const handle = createTagPayloadHandler({
+      engine: stub.engine,
+      boxes: repos.boxes,
+      clock,
+      onForeignBoxCreated: (label) => {
+        notified.push(label);
+        throw new Error('hook exploded'); // must be contained by the handler
+      },
+    });
+
+    // Unknown box → hook fires with the resolved label; TAG_READ still goes out.
+    await handle({ boxUuid: BOX_UUID, label: 'Büro', version: 1 });
+    expect(notified).toEqual(['Büro']);
+    expect(stub.dispatched).toEqual([{ type: 'TAG_READ', boxId: BOX_UUID, at: 1_000 }]);
+
+    // Known box → no re-notification.
+    await handle({ boxUuid: BOX_UUID, label: 'Büro', version: 1 });
+    expect(notified).toEqual(['Büro']);
+    expect(stub.dispatched).toHaveLength(2);
+
+    // Missing label → hook gets the fallback label.
+    const other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+    await handle({ boxUuid: other, version: 1 });
+    expect(notified).toEqual(['Büro', UNKNOWN_BOX_LABEL]);
+  });
 });
 
 // ---------------------------------------------------------------------------

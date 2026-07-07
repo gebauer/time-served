@@ -2,7 +2,10 @@
  * Expo config plugin for the Time Served foreground service (BUILD_V1 §8.4).
  * Adds to the APP manifest:
  *  - permissions: FOREGROUND_SERVICE, FOREGROUND_SERVICE_CONNECTED_DEVICE,
- *    POST_NOTIFICATIONS (runtime-requested on 13+, J11's onboarding flow)
+ *    POST_NOTIFICATIONS (runtime-requested on 13+ by the J11 onboarding flow),
+ *    REQUEST_IGNORE_BATTERY_OPTIMIZATIONS (lets the module fire the one-time
+ *    exemption dialog, BUILD_V1 §8.5 — Play-policy fallback documented in
+ *    modules/fgs/README.md)
  *  - the <service> entry for TimeServedFgsService (type "connectedDevice";
  *    the `specialUse` fallback + Play justification is documented in
  *    modules/fgs/README.md).
@@ -24,6 +27,7 @@ const PERMISSIONS = [
   'android.permission.FOREGROUND_SERVICE',
   'android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE',
   'android.permission.POST_NOTIFICATIONS',
+  'android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
 ];
 
 /** @param {import('expo/config').ExpoConfig} config */

@@ -73,8 +73,10 @@ import type {
   OnboardingStore,
 } from '../ui/services/AppServicesContext';
 import { createGroupCrypto, inviteLinkCodec } from '../domain/crypto';
+import { initInfoNotifications, notifyForeignBoxCreated } from './notifications';
 import { createSettingsStore, deviceTimeZone } from './settingsStore';
 import { createStubGroupsGateway } from './stubGroups';
+import { createSystemStatusService } from './system';
 // --- J10 sync imports (groups/sync wiring section below) ---
 import {
   createDailyStatUploader,
@@ -172,10 +174,20 @@ export async function createAppServices(): Promise<AppServices> {
     repositories,
     clock,
     armTimeoutSec: () => settings.get().armTimeoutSec,
+    // §9.2 one-shot "Neue Box ‚<label>' erkannt" — fire-and-forget local
+    // notification (LOW importance, only with granted permission; J11).
+    onForeignBoxCreated: (label) => void notifyForeignBoxCreated(label),
   });
 
+  // J11: permissions + NFC availability behind the SystemStatusService seam
+  // (Onboarding page 3, Settings system section, Home NFC banner).
+  const system = createSystemStatusService({ mode, tagReader });
+  // Foreground-presentation handler + LOW info channel; never throws.
+  void initInfoNotifications();
+
   // NFC unavailable/disabled must not block bootstrap: history/leaderboard
-  // still work; J11's onboarding/hardening owns the "enable NFC" UX + retry.
+  // still work; the Home banner (useNfcBanner → system.nfcStatus) owns the
+  // "enable NFC" UX and retries via system.restartTagReader on refocus.
   try {
     await tagReader.start();
   } catch (error) {
@@ -300,6 +312,7 @@ export async function createAppServices(): Promise<AppServices> {
     ids,
     events,
     onboarding,
+    system,
     dev,
   };
 }

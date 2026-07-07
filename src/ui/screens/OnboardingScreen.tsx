@@ -1,9 +1,9 @@
 /**
  * Onboarding (BUILD_V1 §11 screen 3) — 4-page pager: the placement ritual
- * (entsperren → Kabel → Box), why charging is the gate, the two permission
- * prompts (real permission calls are J11's — the buttons take callback props
- * and currently no-op), and the §3 transparency notice ("numbers uploaded at
- * seal").
+ * (entsperren → Kabel → Box), why charging is the gate, the two REAL permission
+ * prompts (J11: POST_NOTIFICATIONS + battery-optimization exemption over the
+ * SystemStatusService seam, both optional — denial degrades visibility, never
+ * counting), and the §3 transparency notice ("numbers uploaded at seal").
  */
 import { useRef, useState } from 'react';
 import {
@@ -15,24 +15,18 @@ import {
   View,
 } from 'react-native';
 
-import { Button, Card } from '../components/primitives';
+import { Button, Card, Chip } from '../components/primitives';
+import { useSystemStatus } from '../hooks/useSystemStatus';
 import { strings } from '../strings';
 import { radius, spacing, typography, useTheme } from '../theme';
 
 export interface OnboardingScreenProps {
   onDone: () => void;
-  /** J11 wires the real permission requests; no-ops until then. */
-  onRequestNotifications?: () => void;
-  onRequestBatteryExemption?: () => void;
 }
 
 const PAGE_COUNT = 4;
 
-export function OnboardingScreen({
-  onDone,
-  onRequestNotifications,
-  onRequestBatteryExemption,
-}: OnboardingScreenProps) {
+export function OnboardingScreen({ onDone }: OnboardingScreenProps) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const [page, setPage] = useState(0);
@@ -85,21 +79,7 @@ export function OnboardingScreen({
         </Page>
 
         <Page width={width} title={strings.onboarding.page3Title} body={strings.onboarding.page3Body}>
-          <View style={styles.permissionButtons}>
-            <Button
-              label={strings.onboarding.page3NotificationButton}
-              variant="secondary"
-              onPress={() => onRequestNotifications?.()}
-            />
-            <Button
-              label={strings.onboarding.page3BatteryButton}
-              variant="secondary"
-              onPress={() => onRequestBatteryExemption?.()}
-            />
-            <Text style={[typography.caption, styles.centered, { color: colors.textFaint }]}>
-              {strings.onboarding.page3Hint}
-            </Text>
-          </View>
+          <PermissionsStep />
         </Page>
 
         <Page width={width} title={strings.onboarding.page4Title} body={strings.onboarding.page4Body} />
@@ -123,6 +103,74 @@ export function OnboardingScreen({
           <Button label={strings.onboarding.startButton} onPress={onDone} />
         )}
       </View>
+    </View>
+  );
+}
+
+/**
+ * The two J11 permission requests. Both dialogs resolve outside the app;
+ * useSystemStatus re-reads the states on every refocus. Denial is handled
+ * honestly: a caption explains the (small) consequence + the app-settings
+ * escape hatch — onboarding never blocks on either permission.
+ */
+function PermissionsStep() {
+  const { colors } = useTheme();
+  const status = useSystemStatus();
+  // "Asked and still denied" — only then show the denial hint (a user who
+  // simply has not tapped yet should not read like a denial).
+  const [notifAsked, setNotifAsked] = useState(false);
+
+  return (
+    <View style={styles.permissionButtons}>
+      {status.notifications === 'granted' ? (
+        <Chip label={`${strings.onboarding.page3NotificationButton}: ${strings.onboarding.page3Granted}`} tone="positive" />
+      ) : (
+        <Button
+          label={strings.onboarding.page3NotificationButton}
+          variant="secondary"
+          disabled={status.notifications === undefined}
+          onPress={() => {
+            setNotifAsked(true);
+            void status.requestNotifications();
+          }}
+        />
+      )}
+      {notifAsked && status.notifications === 'denied' && (
+        <>
+          <Text style={[typography.caption, styles.centered, { color: colors.textFaint }]}>
+            {strings.onboarding.page3NotificationDenied}
+          </Text>
+          <Button
+            label={strings.settings.openAppSettings}
+            variant="ghost"
+            onPress={status.openAppSettings}
+          />
+        </>
+      )}
+
+      {status.battery === 'granted' ? (
+        <Chip label={`${strings.onboarding.page3BatteryButton}: ${strings.onboarding.page3Granted}`} tone="positive" />
+      ) : status.battery === 'unavailable' ? (
+        <Text style={[typography.caption, styles.centered, { color: colors.textFaint }]}>
+          {strings.settings.batteryOptUnavailable}
+        </Text>
+      ) : (
+        <>
+          <Button
+            label={strings.onboarding.page3BatteryButton}
+            variant="secondary"
+            disabled={status.battery === undefined}
+            onPress={() => void status.requestBattery()}
+          />
+          {/* §8.5 framing — why this exemption exists. */}
+          <Text style={[typography.caption, styles.centered, { color: colors.textFaint }]}>
+            {strings.onboarding.page3BatteryHint}
+          </Text>
+        </>
+      )}
+      <Text style={[typography.caption, styles.centered, { color: colors.textFaint }]}>
+        {strings.onboarding.page3Hint}
+      </Text>
     </View>
   );
 }

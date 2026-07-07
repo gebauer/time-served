@@ -257,3 +257,76 @@ The one-time exemption request lives in J11's onboarding (see §5.5 above). For 
 on aggressive OEMs (Samsung/Xiaomi/OnePlus), record whether the exemption was granted —
 without it the FGS may die mid-session and every session ends via reconciliation
 (shorter by up to one heartbeat interval). That is degraded precision, not data loss.
+
+## J11 — onboarding & permissions (real device)
+
+Build: real adapters (`EXPO_PUBLIC_TS_REAL_ADAPTERS=1` dev build or release). Reset app
+data (or reinstall) to re-run onboarding. Android 13+ device required for the
+notification-permission paths.
+
+### Notification permission (POST_NOTIFICATIONS, Android 13+)
+
+- [ ] **Grant path.** Onboarding page 3 → "Benachrichtigungen erlauben" → system dialog
+      → allow. Button is replaced by "Erledigt ✓"; Einstellungen → System shows
+      "Erlaubt".
+- [ ] **Deny path.** Deny the dialog instead. Onboarding shows the honest hint ("die
+      Zeit zählt trotzdem …") + an "App-Einstellungen öffnen" escape hatch; onboarding
+      can be completed regardless.
+- [ ] **Degraded-but-working.** With the permission DENIED, run a full session (scan →
+      plug → unplug): the session counts normally and history is correct; the FGS runs
+      but its "Time Served läuft" notification is NOT visible in the drawer (Android
+      suppresses it; the session may still appear under the system's "active apps"
+      affordance). This is the documented behavior — counting never depends on the
+      permission.
+- [ ] **Permanent denial.** Deny twice so the system stops showing the dialog. In
+      Einstellungen → System the button escalates to "App-Einstellungen öffnen" and
+      lands on the app's settings page; granting there flips the row to "Erlaubt" on
+      return (refocus refresh).
+- [ ] **Android 12 or lower** (if available): the request resolves granted without any
+      dialog; row shows "Erlaubt".
+
+### Battery-optimization exemption (§8.5)
+
+- [ ] **Dialog fires.** Onboarding page 3 → "Akku-Optimierung ausnehmen" → the system
+      exemption dialog appears (not the settings list). Framing text ("… während dein
+      Handy in der Box schläft") is visible on the page.
+- [ ] **Allow** → back in the app the button flips to "Erledigt ✓" (refocus refresh);
+      Einstellungen → System shows "Ausgenommen — Sitzungen laufen ungestört."
+- [ ] **Deny** → Settings row shows "Nicht ausgenommen" + hint + "Ausnehmen" button;
+      tapping it re-fires the dialog.
+- [ ] **Verify with adb:** `adb shell dumpsys deviceidle whitelist | grep timeserved`
+      lists the package after allowing.
+
+### Foreign-box info notification (§9.2)
+
+- [ ] With notification permission GRANTED: scan a tag written by ANOTHER device
+      (unknown box UUID). A silent, LOW-importance notification "Neue Box ‚<label>‘
+      erkannt" appears (no sound, no heads-up banner); the session arms normally and
+      the box appears under Boxen with "von anderem Mitglied".
+- [ ] With permission DENIED: same scan — NO notification, but arming/box-creation
+      work identically (the notification is informational only and never blocks
+      TAG_READ).
+- [ ] Re-scanning the same foreign tag later does NOT re-notify (box already known).
+
+### NFC-off / NFC-missing UX
+
+- [ ] Turn NFC OFF, kill and relaunch the app: bootstrap completes (no crash), Home
+      shows the "NFC ist ausgeschaltet" banner with "NFC-Einstellungen öffnen";
+      Verlauf/Gruppen/Einstellungen fully usable.
+- [ ] Tap the banner button → system NFC settings open. Enable NFC, return to the
+      app: banner disappears (refocus recheck) and a tag scan works WITHOUT an app
+      restart (reader restarted via the system seam).
+- [ ] Device without NFC (or emulator in real-adapter mode): banner shows the
+      "Kein NFC auf diesem Gerät" variant, no settings button, no crash; everything
+      except tag-driven sessions works.
+
+### Icon / splash / misc polish
+
+- [ ] Launcher shows the box glyph (adaptive: slate background, glyph within the
+      mask; themed/monochrome icon renders on Android 13+ themed-icons mode).
+- [ ] Cold start shows the splash glyph on the correct light/dark background.
+- [ ] FGS + info notifications use the white glyph as status-bar small icon (not a
+      grey square).
+- [ ] Force a group create/join failure (server unreachable): honest German toast
+      appears, UI stays usable; History edit on a day made sealed meanwhile shows the
+      "versiegelt" toast instead of silently ignoring the tap.

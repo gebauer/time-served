@@ -51,6 +51,13 @@ export const strings = {
     boxLabel: 'Box',
     todayHeading: 'Heute',
     noTimeToday: 'Heute noch keine Zeit abgesessen.',
+    nfcOffTitle: 'NFC ist ausgeschaltet',
+    nfcOffBody:
+      'Ohne NFC erkennt die App deine Boxen nicht. Verlauf und Gruppen funktionieren weiter.',
+    nfcOpenSettings: 'NFC-Einstellungen öffnen',
+    nfcUnsupportedTitle: 'Kein NFC auf diesem Gerät',
+    nfcUnsupportedBody:
+      'Dieses Gerät hat keinen NFC-Chip — Sitzungen über Box-Tags sind hier nicht möglich. Verlauf und Gruppen funktionieren weiter.',
   },
 
   dayNightBar: {
@@ -76,6 +83,9 @@ export const strings = {
     deleteSession: 'Sitzung löschen',
     deleteConfirm: 'Diese Sitzung wirklich löschen? Die Tageszeiten werden neu berechnet.',
     editInvalid: 'Start muss vor dem Ende liegen.',
+    editRejected:
+      'Änderung nicht übernommen: Der betroffene Tag ist bereits versiegelt oder die Zeiten sind ungültig.',
+    deleteRejected: 'Löschen nicht möglich: Der betroffene Tag ist bereits versiegelt.',
   },
 
   boxes: {
@@ -169,6 +179,10 @@ export const strings = {
     youMarker: '(du)',
     leave: 'Gruppe verlassen',
     leaveConfirm: 'Diese Gruppe wirklich verlassen?',
+    createFailed: 'Gruppe konnte nicht erstellt werden. Prüfe deine Verbindung.',
+    joinFailed: 'Beitritt fehlgeschlagen. Prüfe Link und Verbindung.',
+    leaveFailed: 'Verlassen fehlgeschlagen. Prüfe deine Verbindung.',
+    nicknameFailed: 'Nickname konnte nicht gespeichert werden. Prüfe deine Verbindung.',
   },
 
   settings: {
@@ -184,7 +198,20 @@ export const strings = {
       'Vergangene Tage werden zu dieser Uhrzeit versiegelt und ihre Summen hochgeladen.',
     systemHeading: 'System',
     batteryOptLabel: 'Akku-Optimierung',
-    batteryOptUnknown: 'Status unbekannt (wird in der App-Fertigstellung geprüft)',
+    batteryOptGranted: 'Ausgenommen — Sitzungen laufen ungestört.',
+    batteryOptDenied: 'Nicht ausgenommen',
+    batteryOptDeniedHint:
+      'Damit eine Sitzung nicht unterbrochen wird, während dein Handy in der Box schläft.',
+    batteryOptUnavailable: 'Auf diesem Gerät nicht verfügbar.',
+    batteryOptRequest: 'Ausnehmen',
+    notificationsLabel: 'Benachrichtigungen',
+    notificationsGranted: 'Erlaubt',
+    notificationsDenied: 'Nicht erlaubt',
+    notificationsDeniedHint:
+      'Die Zeit zählt trotzdem — du siehst nur keine laufende Sitzung in der Statusleiste.',
+    notificationsUnavailable: 'Auf diesem Gerät nicht verfügbar.',
+    notificationsRequest: 'Erlauben',
+    openAppSettings: 'App-Einstellungen öffnen',
     syncLabel: 'Synchronisierung',
     syncHint:
       'Lädt versiegelte Tages-Summen für deine Gruppen hoch. Ausgeschaltet wird nichts hochgeladen; vergangene Tage bleiben unversiegelt und bearbeitbar.',
@@ -210,7 +237,12 @@ export const strings = {
     page3Body:
       'Für zuverlässige Sitzungen braucht die App eine dauerhafte Benachrichtigung während der Sitzung und eine Ausnahme von der Akku-Optimierung.',
     page3NotificationButton: 'Benachrichtigungen erlauben',
+    page3NotificationDenied:
+      'Ohne Benachrichtigungen zählt die Zeit trotzdem — du siehst nur keine laufende Sitzung in der Statusleiste. Ändern geht in den App-Einstellungen.',
     page3BatteryButton: 'Akku-Optimierung ausnehmen',
+    page3BatteryHint:
+      'Damit eine Sitzung nicht unterbrochen wird, während dein Handy in der Box schläft.',
+    page3Granted: 'Erledigt ✓',
     page3Hint: 'Beides kannst du später in den Einstellungen ändern.',
     page4Title: 'Was geteilt wird',
     page4Body:

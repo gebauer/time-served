@@ -2,7 +2,10 @@ package koeln.gebauer.timeserved.fgs
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -77,6 +80,40 @@ class TimeServedFgsModule : Module() {
     /** Best-effort: true between the service's onCreate and onDestroy. */
     AsyncFunction("isRunning") {
       TimeServedFgsService.isServiceRunning
+    }
+
+    // -----------------------------------------------------------------------
+    // Battery-optimization exemption (BUILD_V1 §8.5, added by J11). Doze never
+    // applies mid-session (phone is charging — CLAUDE.md §4); the exemption
+    // targets aggressive OEM battery managers that kill the FGS regardless.
+    // -----------------------------------------------------------------------
+
+    /** True when the app is already exempt from battery optimizations. */
+    AsyncFunction("isIgnoringBatteryOptimizations") {
+      val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+      pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Fire the one-time system dialog asking for the exemption
+     * (ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS with our package uri; the
+     * REQUEST_IGNORE_BATTERY_OPTIMIZATIONS permission comes from plugins/fgs).
+     * Resolves when the dialog is LAUNCHED, not when the user decides — callers
+     * re-check isIgnoringBatteryOptimizations on the next foreground. Play-policy
+     * fallback (open the app's settings page instead): see modules/fgs/README.md.
+     */
+    AsyncFunction("requestIgnoreBatteryOptimizations") {
+      val intent = Intent(
+        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+        Uri.parse("package:${context.packageName}"),
+      )
+      val activity = appContext.currentActivity
+      if (activity != null) {
+        activity.startActivity(intent)
+      } else {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+      }
     }
   }
 }

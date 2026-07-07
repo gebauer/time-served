@@ -17,8 +17,12 @@ import { isValidSessionEdit } from './historyLogic';
 export interface SessionEditor {
   /** Set new endpoints. Returns false (and writes nothing) if invalid/sealed. */
   updateTimes(id: SessionId, startedAt: EpochMs, endedAt: EpochMs): Promise<boolean>;
-  /** Discard the session and recompute the affected days. */
-  remove(id: SessionId): Promise<void>;
+  /**
+   * Discard the session and recompute the affected days. Returns false (and
+   * writes nothing) when the session touches a sealed day — callers surface
+   * that honestly (J11 toast) instead of silently doing nothing.
+   */
+  remove(id: SessionId): Promise<boolean>;
 }
 
 export function useSessionEditor(): SessionEditor {
@@ -60,12 +64,12 @@ export function useSessionEditor(): SessionEditor {
   );
 
   const remove = useCallback(
-    async (id: SessionId): Promise<void> => {
+    async (id: SessionId): Promise<boolean> => {
       const existing = await repositories.sessions.get(id);
-      if (existing === undefined) return;
+      if (existing === undefined) return false;
       const from = existing.startedAt ?? existing.createdAt;
       const to = existing.endedAt ?? from;
-      if (!(await guardSealed(from, to))) return;
+      if (!(await guardSealed(from, to))) return false;
       await repositories.sessions.update(id, { status: 'discarded' });
       await recomputeRange(
         { sessions: repositories.sessions, dayBuckets: repositories.dayBuckets },
@@ -74,6 +78,7 @@ export function useSessionEditor(): SessionEditor {
         to,
       );
       events.notify();
+      return true;
     },
     [repositories, settings, events, guardSealed],
   );

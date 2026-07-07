@@ -114,6 +114,13 @@ export interface TagPayloadHandlerOptions {
   readonly engine: Pick<EngineHandle, 'dispatch'>;
   readonly boxes: BoxRepository;
   readonly clock: Clock;
+  /**
+   * Optional §9.2 one-shot info hook, fired AFTER a foreign box was auto-created
+   * ("Neue Box ‚<label>' erkannt"). Called fire-and-forget and never awaited —
+   * it can never delay or fail the TAG_READ flow. The composition root passes
+   * the local-notification implementation (src/app/notifications.ts).
+   */
+  readonly onForeignBoxCreated?: (label: string) => void;
 }
 
 /** Fallback label for a foreign tag whose text record is missing/empty. */
@@ -138,14 +145,20 @@ export function createTagPayloadHandler(
     const boxId = payload.boxUuid as BoxId;
     const known = await options.boxes.get(boxId);
     if (known === undefined) {
+      const label =
+        payload.label !== undefined && payload.label !== '' ? payload.label : UNKNOWN_BOX_LABEL;
       await options.boxes.create({
         id: boxId,
-        label: payload.label !== undefined && payload.label !== '' ? payload.label : UNKNOWN_BOX_LABEL,
+        label,
         countMode: 'charging',
         origin: 'foreign',
       });
-      // TODO(J11): optional one-shot info notification "Neue Box ‚<label>' erkannt"
-      // (§9.2) — purely informational, never a dialog.
+      // §9.2 one-shot info notification — fire-and-forget, never blocks TAG_READ.
+      try {
+        options.onForeignBoxCreated?.(label);
+      } catch {
+        // Informational only; a throwing hook must not break the session flow.
+      }
     }
     await options.engine.dispatch({ type: 'TAG_READ', boxId, at: options.clock.now() });
   };
@@ -246,6 +259,8 @@ export interface WireAdaptersOptions {
   readonly clock: Clock;
   /** Read live so Settings changes apply without rewiring. */
   readonly armTimeoutSec: () => number;
+  /** See TagPayloadHandlerOptions.onForeignBoxCreated. */
+  readonly onForeignBoxCreated?: (label: string) => void;
 }
 
 /**
@@ -269,6 +284,7 @@ export function wireAdapters(options: WireAdaptersOptions): () => void {
     engine,
     boxes: repositories.boxes,
     clock,
+    onForeignBoxCreated: options.onForeignBoxCreated,
   });
   const unsubscribeTags = tagReader.subscribe((payload: TagPayload) => {
     void handleTagPayload(payload);

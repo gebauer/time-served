@@ -1,8 +1,8 @@
 /**
  * Settings (BUILD_V1 §11 screen 7) — per-group nicknames, ARM_TIMEOUT,
- * day/night window hours, seal time, battery-optimization status (placeholder
- * until J11), sync toggle, anonymous-identity blurb. Dev harness entry in
- * debug builds.
+ * day/night window hours, seal time, REAL battery-optimization + notification
+ * status (J11, over the SystemStatusService seam), sync toggle,
+ * anonymous-identity blurb. Dev harness entry in debug builds.
  */
 import { useState } from 'react';
 import { StyleSheet, Switch, Text, View } from 'react-native';
@@ -10,9 +10,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { Button, Card, Field, Screen, SectionHeader, Stepper } from '../components/primitives';
+import { useToast } from '../components/Toast';
 import { formatHour } from '../format';
 import { useGroups } from '../hooks/useGroups';
 import { useSettings } from '../hooks/useSettings';
+import { useSystemStatus } from '../hooks/useSystemStatus';
 import { useAppServices } from '../services/AppServicesContext';
 import type { RootStackParamList } from '../navigation';
 import type { GroupSummary } from '../services/AppServicesContext';
@@ -25,6 +27,7 @@ export function SettingsScreen() {
   const { groups, setNickname } = useGroups();
   const { dev } = useAppServices();
   const { colors } = useTheme();
+  const toast = useToast();
 
   const clampHour = (hour: number) => ((hour % 24) + 24) % 24;
 
@@ -41,7 +44,11 @@ export function SettingsScreen() {
             <NicknameRow
               key={group.groupId}
               group={group}
-              onSave={(nick) => void setNickname(group.groupId, nick)}
+              onSave={(nick) =>
+                void setNickname(group.groupId, nick).catch(() =>
+                  toast.show(strings.groups.nicknameFailed, 'danger'),
+                )
+              }
             />
           ))
         )}
@@ -99,11 +106,7 @@ export function SettingsScreen() {
 
       <SectionHeader>{strings.settings.systemHeading}</SectionHeader>
       <Card>
-        <SettingRow label={strings.settings.batteryOptLabel}>
-          <Text style={[typography.caption, { color: colors.textFaint }]}>
-            {strings.settings.batteryOptUnknown}
-          </Text>
-        </SettingRow>
+        <SystemPermissionRows />
         <SettingRow label={strings.settings.syncLabel} hint={strings.settings.syncHint}>
           <Switch
             value={values.syncEnabled}
@@ -131,6 +134,86 @@ export function SettingsScreen() {
         </>
       )}
     </Screen>
+  );
+}
+
+/**
+ * J11: live battery-exemption + notification-permission status (BUILD_V1 §8.5
+ * / §11 screen 7). States refresh on refocus (both system dialogs resolve
+ * outside the app). A denied notification permission cannot be re-requested
+ * once permanently denied — the button then leads to the app settings page.
+ */
+function SystemPermissionRows() {
+  const { colors } = useTheme();
+  const status = useSystemStatus();
+  const [notifAsked, setNotifAsked] = useState(false);
+
+  const batteryText =
+    status.battery === 'granted'
+      ? strings.settings.batteryOptGranted
+      : status.battery === 'denied'
+        ? strings.settings.batteryOptDenied
+        : strings.settings.batteryOptUnavailable;
+  const notifText =
+    status.notifications === 'granted'
+      ? strings.settings.notificationsGranted
+      : status.notifications === 'denied'
+        ? strings.settings.notificationsDenied
+        : strings.settings.notificationsUnavailable;
+
+  return (
+    <>
+      <SettingRow
+        label={strings.settings.batteryOptLabel}
+        hint={status.battery === 'denied' ? strings.settings.batteryOptDeniedHint : undefined}
+      >
+        {status.battery === 'denied' ? (
+          <Button
+            label={strings.settings.batteryOptRequest}
+            variant="secondary"
+            onPress={() => void status.requestBattery()}
+          />
+        ) : (
+          <Text style={[typography.caption, styles.statusText, { color: colors.textMuted }]}>
+            {status.battery === undefined ? strings.common.loading : batteryText}
+          </Text>
+        )}
+      </SettingRow>
+      <SettingRow
+        label={strings.settings.notificationsLabel}
+        hint={
+          status.notifications === 'denied'
+            ? strings.settings.notificationsDeniedHint
+            : undefined
+        }
+      >
+        {status.notifications === 'denied' ? (
+          <Button
+            label={
+              notifAsked
+                ? strings.settings.openAppSettings
+                : strings.settings.notificationsRequest
+            }
+            variant="secondary"
+            onPress={() => {
+              if (notifAsked) {
+                status.openAppSettings();
+                return;
+              }
+              void status.requestNotifications().then((state) => {
+                // Request came back denied without a dialog → permanently
+                // denied; escalate the button to the app settings page.
+                if (state === 'denied') setNotifAsked(true);
+              });
+            }}
+          />
+        ) : (
+          <Text style={[typography.caption, styles.statusText, { color: colors.textMuted }]}>
+            {status.notifications === undefined ? strings.common.loading : notifText}
+          </Text>
+        )}
+      </SettingRow>
+    </>
   );
 }
 
@@ -211,6 +294,10 @@ function NicknameRow({
 }
 
 const styles = StyleSheet.create({
+  statusText: {
+    maxWidth: 160,
+    textAlign: 'right',
+  },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',

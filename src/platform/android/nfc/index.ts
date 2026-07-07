@@ -16,3 +16,5 @@ export {
 } from './ndef';
 export type { RawNdefRecord, TagDecodeResult, NdefContentKind, BoxTagContent } from './ndef';
 export { TagReadDeduper, TAG_READ_DEDUPE_WINDOW_MS } from './dedupe';
+export { getNfcStatus, openNfcSettings } from './nfcStatus';
+export type { NfcStatus } from './nfcStatus';

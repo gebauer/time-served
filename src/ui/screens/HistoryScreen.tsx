@@ -10,6 +10,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SessionEndReason } from '../../domain/types';
 import { DayNightBar } from '../components/DayNightBar';
 import { Button, Card, Chip, EmptyState, Screen } from '../components/primitives';
+import { useToast } from '../components/Toast';
 import { formatClockTime, formatDuration, formatLocalDate } from '../format';
 import type { HistorySession } from '../hooks/historyLogic';
 import { useHistory, type HistoryDay } from '../hooks/useHistory';
@@ -150,10 +151,18 @@ function SessionRow({
   const { colors } = useTheme();
   const { settings } = useAppServices();
   const editor = useSessionEditor();
+  const toast = useToast();
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const timeZone = settings.timeZone;
   const reason = entry.session.endReason;
+
+  // J11: a rejected edit/delete (sealed day touched, invalid times) must not
+  // fail silently — the editor returns false, we say so honestly.
+  const shift = (startedAt: number, endedAt: number) =>
+    void editor.updateTimes(entry.session.id, startedAt, endedAt).then((applied) => {
+      if (!applied) toast.show(strings.history.editRejected, 'danger');
+    });
 
   return (
     <View style={[styles.sessionRow, { borderTopColor: colors.border }]}>
@@ -193,24 +202,12 @@ function SessionRow({
           <TimeAdjuster
             label={strings.history.startLabel}
             value={formatClockTime(entry.startedAt, timeZone)}
-            onShift={(deltaMs) =>
-              void editor.updateTimes(
-                entry.session.id,
-                entry.startedAt + deltaMs,
-                entry.endedAt,
-              )
-            }
+            onShift={(deltaMs) => shift(entry.startedAt + deltaMs, entry.endedAt)}
           />
           <TimeAdjuster
             label={strings.history.endLabel}
             value={formatClockTime(entry.endedAt, timeZone)}
-            onShift={(deltaMs) =>
-              void editor.updateTimes(
-                entry.session.id,
-                entry.startedAt,
-                entry.endedAt + deltaMs,
-              )
-            }
+            onShift={(deltaMs) => shift(entry.startedAt, entry.endedAt + deltaMs)}
           />
           {confirmDelete ? (
             <View style={styles.editorActions}>
@@ -220,7 +217,11 @@ function SessionRow({
               <Button
                 label={strings.common.delete}
                 variant="danger"
-                onPress={() => void editor.remove(entry.session.id)}
+                onPress={() =>
+                  void editor.remove(entry.session.id).then((removed) => {
+                    if (!removed) toast.show(strings.history.deleteRejected, 'danger');
+                  })
+                }
               />
               <Button
                 label={strings.common.cancel}

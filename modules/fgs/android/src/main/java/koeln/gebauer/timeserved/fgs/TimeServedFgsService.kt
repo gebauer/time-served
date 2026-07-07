@@ -209,9 +209,14 @@ class TimeServedFgsService : Service() {
     val title =
       if (boxLabel.isBlank()) "Time Served läuft"
       else "Time Served läuft – Box: $boxLabel"
+    // Prefer the proper white-on-transparent status-bar icon that the
+    // expo-notifications config plugin generates (J11, app.config.ts); the
+    // launcher icon stays as fallback so this module needs no own drawable.
+    val smallIcon = resources
+      .getIdentifier("notification_icon", "drawable", packageName)
+      .takeIf { it != 0 } ?: applicationInfo.icon
     return NotificationCompat.Builder(this, CHANNEL_ID)
-      // The app's launcher icon; avoids bundling a drawable into this module.
-      .setSmallIcon(applicationInfo.icon)
+      .setSmallIcon(smallIcon)
       .setContentTitle(title)
       .setOngoing(true)
       .setSilent(true)

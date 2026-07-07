@@ -1,6 +1,6 @@
 /**
- * Group join (BUILD_V1 §10.4/§11) — invite link (pasted for now; deep-link
- * wiring lands with J10/J11) → nickname → EXPLICIT consent toggle with the
+ * Group join (BUILD_V1 §10.4/§11) — invite link (pasted, or prefilled by the
+ * J10 deep-link handler in App.tsx) → nickname → EXPLICIT consent toggle with the
  * exact meaning: "Diese Gruppe darf meine täglichen Summen sehen".
  */
 import { useState } from 'react';
@@ -86,7 +86,9 @@ export function GroupJoinScreen() {
               () => navigation.goBack(),
               () => {
                 setBusy(false);
-                setError(strings.groups.linkInvalid);
+                // Honest copy: the link already validated locally — a rejected
+                // join here is usually network/server, not a malformed link.
+                setError(strings.groups.joinFailed);
               },
             );
           }}

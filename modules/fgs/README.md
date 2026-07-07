@@ -21,9 +21,26 @@ Never `requireNativeModule('TimeServedFgs')` directly — use the typed wrapper
 | `stopService()` | Stops the FGS; no-op when not running. |
 | `updateLabel(boxLabel)` | Updates the ongoing notification label in-process; no-op when not running. |
 | `isRunning()` | Best-effort: true between service `onCreate`/`onDestroy`. |
+| `isIgnoringBatteryOptimizations()` | `PowerManager.isIgnoringBatteryOptimizations(pkg)` — true when the app is exempt. |
+| `requestIgnoreBatteryOptimizations()` | Fires the one-time system exemption dialog (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + `package:` uri). Resolves at launch, not at the user's decision — re-check status on the next foreground. |
 
 Events: `powerDisconnected { at }`, `batteryHeartbeat { at, charging }` — epoch ms,
 timestamps taken native-side and passed through unchanged.
+
+## Battery-optimization exemption & Play policy
+
+The direct dialog needs `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` in the manifest (added
+by `plugins/fgs`). Google Play treats this permission as an *acceptable-use* case: the
+app must have a core feature that demonstrably breaks under battery optimization. Ours
+qualifies (a multi-hour FGS session on OEMs that kill services), but a reviewer may
+still object.
+
+**Fallback if Play review objects:** drop the permission from `plugins/fgs`, replace the
+`requestIgnoreBatteryOptimizations()` call sites with opening the app's own settings
+page — `ACTION_APPLICATION_DETAILS_SETTINGS` (from JS simply
+`Linking.openSettings()`) — and instruct the user in copy to set battery usage to
+"Unrestricted" there. Status detection (`isIgnoringBatteryOptimizations()`) needs no
+permission and keeps working either way.
 
 ## Notification
 

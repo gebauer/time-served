@@ -43,6 +43,17 @@ declare class TimeServedFgsModuleType extends NativeModule<TimeServedFgsEvents> 
   updateLabel(boxLabel: string): Promise<void>;
   /** Best-effort: true between service onCreate and onDestroy. */
   isRunning(): Promise<boolean>;
+  /**
+   * True when the app is exempt from battery optimizations (BUILD_V1 §8.5).
+   * Needs no permission; safe to re-check on every foreground.
+   */
+  isIgnoringBatteryOptimizations(): Promise<boolean>;
+  /**
+   * Fire the one-time system exemption dialog. Resolves when the dialog is
+   * LAUNCHED, not when the user decides — re-check the status on the next
+   * foreground. Play-policy fallback: modules/fgs/README.md.
+   */
+  requestIgnoreBatteryOptimizations(): Promise<void>;
 }
 
 export type { TimeServedFgsModuleType };

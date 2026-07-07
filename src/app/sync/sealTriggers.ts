@@ -12,8 +12,8 @@
  * the user opens the app" is a perfectly good trigger. Expo SDK 57's
  * expo-background-task (WorkManager, ≥15-min granularity, OS-discretionary)
  * adds a native module + config plugin for a marginal freshness win; on the
- * OEM-killed-process worst case it is not reliable either. Revisit in J11 if
- * "seal without opening the app" becomes a requirement.
+ * OEM-killed-process worst case it is not reliable either. Tracked in docs/BACKLOG.md
+ * ("background sealing") should "seal without opening the app" become a requirement.
  *
  * This module imports react-native and must only be pulled in from the
  * composition root (services.ts) — never from tests or domain/ui code.

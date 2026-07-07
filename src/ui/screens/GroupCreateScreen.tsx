@@ -8,6 +8,7 @@ import { StyleSheet, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 import { Button, Card, Field, Screen } from '../components/primitives';
+import { useToast } from '../components/Toast';
 import { useGroups } from '../hooks/useGroups';
 import { strings } from '../strings';
 import { spacing, typography, useTheme } from '../theme';
@@ -16,6 +17,7 @@ export function GroupCreateScreen() {
   const navigation = useNavigation();
   const { create } = useGroups();
   const { colors } = useTheme();
+  const toast = useToast();
   const [name, setName] = useState('');
   const [nickname, setNickname] = useState('');
   const [busy, setBusy] = useState(false);
@@ -70,7 +72,10 @@ export function GroupCreateScreen() {
             setBusy(true);
             void create(name.trim(), nickname.trim()).then(
               (result) => setInviteLink(result.inviteLink),
-              () => setBusy(false),
+              () => {
+                setBusy(false);
+                toast.show(strings.groups.createFailed, 'danger');
+              },
             );
           }}
         />

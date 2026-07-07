@@ -191,3 +191,35 @@ copy updated accordingly). Bootstrap ordering (composition root): the seal trigg
 attach AFTER the launch APP_RESUMED reconciliation and the launch-tag drain, so the
 first run seals reconciled bucket totals. Revisit in J11 if background sealing
 becomes a requirement.
+
+### #13 — 2026-07-07 — J11: SystemStatusService on the AppServices seam (+ small additive hooks)
+
+No original contract file changed; this extends J8's `AppServices` seam
+(CONTRACT_CHANGES.md #9) and J4/J5-adjacent adapters ADDITIVELY:
+
+- **`SystemStatusService`** added to `src/ui/services/AppServicesContext.ts` and as a
+  required `system` member of `AppServices`: notification-permission read/request
+  (expo-notifications), battery-exemption read/request (modules/fgs), NFC
+  availability (`ok`/`disabled`/`unsupported`) + settings navigation + tag-reader
+  restart, app-settings navigation. Implemented in `src/app/system.ts`; the fakes
+  mode reports NFC `ok` and battery `unavailable` so the emulator harness stays
+  noise-free. ui/ consumes only the interface (lint-enforced).
+- **modules/fgs**: two additive native methods, `isIgnoringBatteryOptimizations()`
+  (PowerManager) and `requestIgnoreBatteryOptimizations()` (system dialog with
+  `package:` uri). `plugins/fgs` now also injects
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`; the Play-policy fallback (app settings
+  page instead of the dialog) is documented in modules/fgs/README.md. The FGS
+  notification prefers the expo-notifications-generated `notification_icon`
+  drawable (white-on-transparent) over the launcher icon, with fallback.
+- **`src/app/wiring.ts`**: optional `onForeignBoxCreated?: (label) => void` on
+  `TagPayloadHandlerOptions`/`WireAdaptersOptions` — the §9.2 one-shot info
+  notification hook. Fire-and-forget; a throwing hook cannot break TAG_READ
+  (unit-tested). Composition root passes `notifyForeignBoxCreated`
+  (`src/app/notifications.ts`, LOW-importance channel `timeserved_info`).
+- ui-internal, not a contract: `SessionEditor.remove` now returns `Promise<boolean>`
+  so rejected deletes (sealed day) surface a toast instead of failing silently.
+
+Deps added (J11): `expo-notifications`, `expo-splash-screen`, `expo-system-ui`.
+Affects nobody retroactively; iOS adapters later implement the same
+`SystemStatusService` semantics (notification permission via UNUserNotificationCenter,
+battery exemption `unavailable`, NFC via NFCTagReaderSession availability).

@@ -104,6 +104,48 @@ export interface GroupsGateway {
 }
 
 // ---------------------------------------------------------------------------
+// System status — permissions + NFC availability (J11, CONTRACT_CHANGES.md #13).
+// Implemented in src/app/system.ts (expo-notifications, modules/fgs, nfc-manager);
+// a benign fake keeps the emulator harness working. ui/ consumes ONLY this
+// interface — never the native APIs (CLAUDE.md §10).
+// ---------------------------------------------------------------------------
+
+/** Tri-state for a system permission; 'unavailable' = not applicable here. */
+export type PermissionState = 'granted' | 'denied' | 'unavailable';
+
+/** NFC adapter state — 'disabled' is user-fixable, 'unsupported' is not. */
+export type NfcAvailability = 'ok' | 'disabled' | 'unsupported';
+
+export interface SystemStatusService {
+  /**
+   * POST_NOTIFICATIONS runtime permission (Android 13+; auto-granted below).
+   * The app works without it — sessions count regardless; only the FGS status
+   * notification and info notifications become invisible (DEVICE_TESTS §J11).
+   */
+  notificationPermission(): Promise<PermissionState>;
+  /** Fire the runtime request; resolves with the resulting state. */
+  requestNotificationPermission(): Promise<PermissionState>;
+  /** Battery-optimization exemption (BUILD_V1 §8.5); 'granted' = exempt. */
+  batteryExemption(): Promise<PermissionState>;
+  /**
+   * Fire the one-time system exemption dialog. Resolves at launch, not at the
+   * user's decision — re-read batteryExemption() when the app refocuses.
+   */
+  requestBatteryExemption(): Promise<void>;
+  /** NFC adapter state right now. */
+  nfcStatus(): Promise<NfcAvailability>;
+  /** Open the system NFC settings screen (no-op where unsupported). */
+  openNfcSettings(): Promise<void>;
+  /**
+   * Re-attempt starting the passive tag reader (after the user re-enabled
+   * NFC — the bootstrap start failed then). True when the reader runs.
+   */
+  restartTagReader(): Promise<boolean>;
+  /** This app's system settings page (fallback when a request was denied). */
+  openAppSettings(): Promise<void>;
+}
+
+// ---------------------------------------------------------------------------
 // Onboarding flag
 // ---------------------------------------------------------------------------
 
@@ -157,6 +199,7 @@ export interface AppServices {
   readonly ids: IdSource;
   readonly events: ChangeNotifier;
   readonly onboarding: OnboardingStore;
+  readonly system: SystemStatusService;
   /** Present only in __DEV__ builds. */
   readonly dev?: DevControls;
 }

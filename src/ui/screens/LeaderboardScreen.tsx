@@ -1,15 +1,18 @@
 /**
  * Per-group leaderboard (BUILD_V1 §11 screen 6) — period tabs Gestern/Woche/
  * Gesamt over J2's buildLeaderboard; day/night split per row; long-press a row
- * for a LOCAL rename (nick_overrides — never synced).
+ * for a LOCAL rename (nick_overrides — never synced). J11: "Gruppe verlassen"
+ * with inline confirm + honest failure toast.
  */
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRoute, type RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 
 import type { LeaderboardPeriod, LeaderboardRow, UserId } from '../../domain/types';
 import { Button, Card, EmptyState, Field, Screen } from '../components/primitives';
+import { useToast } from '../components/Toast';
 import { formatDuration } from '../format';
+import { useGroups } from '../hooks/useGroups';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import type { RootStackParamList } from '../navigation';
 import { strings } from '../strings';
@@ -86,6 +89,8 @@ export function LeaderboardScreen() {
         </Card>
       )}
 
+      <LeaveGroupSection groupId={groupId} />
+
       {renaming !== undefined && (
         <Card>
           <Text style={[typography.heading, { color: colors.text }]}>
@@ -126,6 +131,56 @@ export function LeaderboardScreen() {
         </Card>
       )}
     </Screen>
+  );
+}
+
+/** J11: leave the group — inline confirm, failure toast, back on success. */
+function LeaveGroupSection({ groupId }: { groupId: RootStackParamList['Leaderboard']['groupId'] }) {
+  const navigation = useNavigation();
+  const { leave } = useGroups();
+  const toast = useToast();
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { colors } = useTheme();
+
+  if (!confirming) {
+    return (
+      <Button
+        label={strings.groups.leave}
+        variant="ghost"
+        onPress={() => setConfirming(true)}
+      />
+    );
+  }
+  return (
+    <Card>
+      <Text style={[typography.body, { color: colors.text }]}>
+        {strings.groups.leaveConfirm}
+      </Text>
+      <View style={styles.renameActions}>
+        <Button
+          label={strings.groups.leave}
+          variant="danger"
+          busy={busy}
+          onPress={() => {
+            setBusy(true);
+            void leave(groupId).then(
+              () => navigation.goBack(),
+              () => {
+                setBusy(false);
+                setConfirming(false);
+                toast.show(strings.groups.leaveFailed, 'danger');
+              },
+            );
+          }}
+        />
+        <Button
+          label={strings.common.cancel}
+          variant="ghost"
+          onPress={() => setConfirming(false)}
+        />
+      </View>
+    </Card>
   );
 }
 
