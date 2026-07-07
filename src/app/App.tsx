@@ -1,30 +1,190 @@
 /**
- * App root — navigation, providers, bootstrap live here (CLAUDE.md §6).
- * Placeholder until J8 lands the real screens.
+ * App root (CLAUDE.md §6) — bootstraps the AppServices composition root
+ * (services.ts, the J9/J10 swap surface), gates on onboarding, and hosts the
+ * navigation tree: bottom tabs (Home, Verlauf, Boxen, Gruppen, Einstellungen)
+ * plus root-stack flows (Box-Wizard, Gruppe erstellen/beitreten, Rangliste,
+ * Dev-Harness).
  */
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Text, useColorScheme, View } from 'react-native';
+import {
+  DarkTheme,
+  DefaultTheme,
+  NavigationContainer,
+  type Theme as NavigationTheme,
+} from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+
+import type { RootStackParamList, TabsParamList } from '../ui/navigation';
+import { BoxesScreen } from '../ui/screens/BoxesScreen';
+import { BoxWizardScreen } from '../ui/screens/BoxWizardScreen';
+import { DevHarnessScreen } from '../ui/screens/DevHarnessScreen';
+import { GroupCreateScreen } from '../ui/screens/GroupCreateScreen';
+import { GroupJoinScreen } from '../ui/screens/GroupJoinScreen';
+import { GroupsScreen } from '../ui/screens/GroupsScreen';
+import { HistoryScreen } from '../ui/screens/HistoryScreen';
+import { HomeScreen } from '../ui/screens/HomeScreen';
+import { LeaderboardScreen } from '../ui/screens/LeaderboardScreen';
+import { OnboardingScreen } from '../ui/screens/OnboardingScreen';
+import { SettingsScreen } from '../ui/screens/SettingsScreen';
+import {
+  AppServicesContext,
+  type AppServices,
+} from '../ui/services/AppServicesContext';
+import { strings } from '../ui/strings';
+import { darkPalette, lightPalette } from '../ui/theme';
+import { createAppServices } from './services';
+
+const Tab = createBottomTabNavigator<TabsParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const [services, setServices] = useState<AppServices | undefined>(undefined);
+  const [onboarded, setOnboarded] = useState<boolean | undefined>(undefined);
+  const scheme = useColorScheme();
+  const palette = scheme === 'dark' ? darkPalette : lightPalette;
+
+  useEffect(() => {
+    void createAppServices().then(async (created) => {
+      const done = await created.onboarding.isDone();
+      setOnboarded(done);
+      setServices(created);
+    });
+  }, []);
+
+  const navigationTheme: NavigationTheme = useMemo(() => {
+    const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: palette.action,
+        background: palette.background,
+        card: palette.surface,
+        text: palette.text,
+        border: palette.border,
+      },
+    };
+  }, [scheme, palette]);
+
+  if (services === undefined || onboarded === undefined) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: palette.background,
+          gap: 12,
+        }}
+      >
+        <ActivityIndicator color={palette.textMuted} />
+        <Text style={{ color: palette.textMuted }}>{strings.common.loading}</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Time Served</Text>
-      <Text>Scaffold (J1) — screens land with J8.</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AppServicesContext.Provider value={services}>
+      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      {onboarded ? (
+        <NavigationContainer theme={navigationTheme}>
+          <RootStack />
+        </NavigationContainer>
+      ) : (
+        <OnboardingScreen
+          onDone={() => {
+            void services.onboarding.markDone();
+            setOnboarded(true);
+          }}
+          // J11 wires the real permission requests.
+          onRequestNotifications={() => {}}
+          onRequestBatteryExemption={() => {}}
+        />
+      )}
+    </AppServicesContext.Provider>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-  },
-});
+function RootStack() {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="BoxWizard"
+        component={BoxWizardScreen}
+        options={{ title: strings.wizard.title, presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="GroupCreate"
+        component={GroupCreateScreen}
+        options={{ title: strings.groups.createTitle, presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="GroupJoin"
+        component={GroupJoinScreen}
+        options={{ title: strings.groups.joinTitle, presentation: 'modal' }}
+      />
+      <Stack.Screen
+        name="Leaderboard"
+        component={LeaderboardScreen}
+        options={({ route }) => ({ title: route.params.groupName })}
+      />
+      <Stack.Screen
+        name="DevHarness"
+        component={DevHarnessScreen}
+        options={{ title: strings.dev.title }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+const TAB_GLYPHS: Record<keyof TabsParamList, string> = {
+  Home: '⌂',
+  Verlauf: '◔',
+  Boxen: '▣',
+  Gruppen: '◎',
+  Einstellungen: '⚙',
+};
+
+function Tabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ color }) => (
+          <Text style={{ color, fontSize: 19, lineHeight: 24 }}>
+            {TAB_GLYPHS[route.name]}
+          </Text>
+        ),
+      })}
+    >
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
+        options={{ title: strings.tabs.home, headerShown: false }}
+      />
+      <Tab.Screen
+        name="Verlauf"
+        component={HistoryScreen}
+        options={{ title: strings.tabs.history }}
+      />
+      <Tab.Screen
+        name="Boxen"
+        component={BoxesScreen}
+        options={{ title: strings.tabs.boxes }}
+      />
+      <Tab.Screen
+        name="Gruppen"
+        component={GroupsScreen}
+        options={{ title: strings.tabs.groups }}
+      />
+      <Tab.Screen
+        name="Einstellungen"
+        component={SettingsScreen}
+        options={{ title: strings.tabs.settings }}
+      />
+    </Tab.Navigator>
+  );
+}

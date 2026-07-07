@@ -16,6 +16,11 @@ export default defineConfig({
       // J4/J5: pure platform tests (NDEF codec, power normalization, fakes) —
       // no native modules, plain Node.
       'src/platform/**/*.test.ts',
+      // J8: pure UI logic (formatters, DayNightBar math, strings table, hook
+      // logic) and app-layer stubs (invite codec) — .ts only, never .tsx, so
+      // still plain Node without react-native.
+      'src/ui/**/*.test.ts',
+      'src/app/**/*.test.ts',
     ],
     environment: 'node',
   },

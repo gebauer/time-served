@@ -85,3 +85,24 @@ listener + FGS receiver) and normalizes per subscription
 No signature change — behavioral clarification only. Affects J9 (consumes the stream;
 may map events 1:1 onto domain events without extra dedupe) and the iOS adapter later
 (should follow the same rules). **Accepted** (coordinator, 2026-07-07).
+
+### #8 — 2026-07-07 — PROPOSAL (J8): AppServices seam + GroupsGateway interface
+
+No existing contract file changed. J8 adds a new UI-side injection seam,
+`src/ui/services/AppServicesContext.ts`, containing the `AppServices` aggregate the
+screens consume (engine handle, repositories, TagWriter, settings, clock, change
+notifier, dev controls) plus a new `GroupsGateway` interface (group list/create/join/
+leave, decrypted members, sealed stats, invite links). The concrete wiring lives in
+ONE file — `src/app/services.ts` — which is the designated swap surface:
+
+- **J9** swaps the data adapters (LokiJS in-memory → SQLite, InMemorySecureStore →
+  ExpoSecureKeyValueStore) and the platform fakes (FakeTagReader/Writer/Power/Runtime →
+  Android adapters) there, and owns the final TAG_READ/ARM_TIMEOUT wiring currently
+  stubbed in `src/app/wiring.ts` (unknown-tag auto-creates a foreign box; ARM_TIMEOUT
+  scheduled via setTimeout).
+- **J10** swaps `createStubGroupsGateway` (in-memory members/stats, Math.random keys,
+  stub invite codec in `src/app/stubCrypto.ts` — link format already matches §10.4)
+  for the real PocketBase gateway on J6's crypto; `GroupsGateway` is the seam to
+  implement.
+
+Affects J9/J10 (implement against these seams), no other jobs.
