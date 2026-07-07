@@ -32,6 +32,8 @@ export class AndroidTagReader implements TagReader {
   private readonly deduper = new TagReadDeduper();
   private running = false;
   private nfcStarted = false;
+  /** Count of payloads emitted to listeners (lets emitLaunchTag report emission). */
+  private emitCount = 0;
 
   /** Lazily initialize the native NFC manager once per process. */
   private async ensureNfcStarted(): Promise<void> {
@@ -81,6 +83,35 @@ export class AndroidTagReader implements TagReader {
     }
   }
 
+  /**
+   * Launch-by-tag path (BUILD_V1 §8.1, additive — CONTRACT_CHANGES.md #10): when a
+   * scan from the home screen cold-starts the app via the manifest NDEF intent
+   * filter (plugins/nfc), reader mode was not yet registered, so the tag arrives
+   * on the activity's launch intent instead of as a DiscoverTag event. Drain it
+   * once at bootstrap: decode + dedupe + emit exactly like a reader-mode read.
+   *
+   * Returns true when a Time Served payload was emitted. Never throws — a missing
+   * activity/intent (normal launch) resolves false. Call AFTER wiring subscribers.
+   * Warm scans (app process alive, backgrounded) do NOT need this: nfc-manager's
+   * onNewIntent delivers those as regular DiscoverTag events.
+   *
+   * Note: a relaunch from recents can re-deliver the original launch intent after
+   * a process death. Worst case that re-arms the box (nothing is persisted in
+   * ARMED; the arm window times out) — accepted, matches §6 semantics.
+   */
+  async emitLaunchTag(): Promise<boolean> {
+    try {
+      await this.ensureNfcStarted();
+      const tag = await NfcManager.getLaunchTagEvent();
+      if (tag === null || tag === undefined) return false;
+      const before = this.emitCount;
+      this.onTagDiscovered(tag);
+      return this.emitCount > before;
+    } catch {
+      return false; // no activity / no NFC intent — a normal launch
+    }
+  }
+
   /** §9.2 detection over one discovered tag. Interaction-free by construction. */
   private onTagDiscovered(tag: TagEvent): void {
     const result = decodeBoxTag(tag?.ndefMessage);
@@ -96,6 +127,7 @@ export class AndroidTagReader implements TagReader {
         return;
       case 'ours': {
         if (!this.deduper.shouldEmit(result.payload.boxUuid)) return;
+        this.emitCount += 1;
         for (const listener of this.listeners) {
           listener(result.payload);
         }

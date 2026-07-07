@@ -85,7 +85,7 @@ listener + FGS receiver) and normalizes per subscription
 No signature change — behavioral clarification only. Affects J9 (consumes the stream;
 may map events 1:1 onto domain events without extra dedupe) and the iOS adapter later
 (should follow the same rules). **Accepted** (coordinator, 2026-07-07).
-<<<<<<< HEAD
+
 ### #8 — 2026-07-07 — PROPOSAL (J6): noble crypto libs instead of libsodium
 
 JOBS.md J6 suggests libsodium (`libsodium-wrappers` / `react-native-libsodium`).
@@ -130,3 +130,29 @@ ONE file — `src/app/services.ts` — which is the designated swap surface:
 
 Affects J9/J10 (implement against these seams), no other jobs. **Accepted**
 (coordinator, 2026-07-07).
+
+### #10 — 2026-07-07 — PROPOSAL (J9): additive `AndroidTagReader.emitLaunchTag()` for launch-by-tag
+
+The `TagReader` contract file is UNCHANGED — this is an additive method on J4's
+`AndroidTagReader` class only, logged because it extends another job's adapter. When a
+home-screen scan cold-starts the app through the manifest NDEF intent filter
+(`plugins/nfc`), reader mode was not yet registered, so the tag arrives on the
+activity's launch intent instead of as a DiscoverTag event. `emitLaunchTag()` drains
+that intent once at bootstrap via nfc-manager's `getLaunchTagEvent()` and pushes the
+tag through the EXACT same §9.2 decode + dedupe + emit path as a reader-mode read (the
+shared dedupe window also prevents a double TAG_READ when reader mode re-detects the
+tag right after). Warm scans (process alive, backgrounded) need nothing: nfc-manager's
+`onNewIntent` already delivers those as DiscoverTag events. Called only by the J9
+composition root (`src/app/services.ts`), after the bootstrap APP_RESUMED
+reconciliation. Known quirk (documented in the method + DEVICE_TESTS §J9): a recents
+relaunch after process death can re-deliver the old tag intent → re-arms the box, which
+times out harmlessly (ARMED persists nothing). Affects the iOS adapter later (its
+equivalent is the `expo-linking` URL launch path). Fakes/tests unaffected.
+
+Also J9, no contract impact, recorded for coordination: the dev/real **adapter-mode
+switch** lives in `src/app/services.ts` — release builds always compose the real
+adapters (SQLite/Keystore/Android seams); dev builds default to the J4/J5 fakes +
+in-memory data (DevHarness path) unless bundled with `EXPO_PUBLIC_TS_REAL_ADAPTERS=1`.
+Wizard write steps run with the passive reader paused via a `TagWriter` wrapper
+(`createExclusiveTagWriter` in `src/app/wiring.ts`), per the AndroidTagWriter header's
+instruction to J9.

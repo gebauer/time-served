@@ -145,3 +145,115 @@ The one-time exemption request ("so a session isn't cut short while your phone s
 in the box") is J11's onboarding flow — NOT tested here. For J5 runs on aggressive
 OEMs (Samsung/Xiaomi), note in the run log whether the exemption was granted, since it
 changes FGS survival behavior.
+
+## J9 — end-to-end integration (real device)
+
+The live loop: real adapters wired in `src/app/services.ts` (SQLite + Keystore +
+AndroidTagReader/Writer + AndroidPowerStateProvider + AndroidSessionRuntime). Needs a
+registered box (wizard, two written tags) and a charger in the box. Record device model +
+Android version + result per run.
+
+Adapter-mode note: RELEASE builds always use the real adapters. DEV builds default to the
+FAKES (in-memory DB + demo seed; DevHarness drives everything on the emulator). To run a
+dev build against the real adapters, build with the bundle-time flag:
+
+```bash
+EXPO_PUBLIC_TS_REAL_ADAPTERS=1 pnpm expo run:android
+```
+
+(The flag is inlined by Metro at bundle time — restart the bundler after changing it. In
+real mode the DevHarness stays usable in degraded form: simulate buttons inject domain
+events directly; `presentTag` is a no-op.)
+
+### How to run the first device build
+
+Requirements:
+
+- **JDK 17** (`java -version` must say 17.x — RN 0.86/AGP requires it; newer JDKs fail
+  the Gradle build). E.g. `sudo apt install openjdk-17-jdk` +
+  `export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64`.
+- **Android SDK**: `ANDROID_HOME` set; SDK Platform 36 + Build-Tools + Platform-Tools
+  installed (`sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"`).
+- **Device**: NFC-capable phone, developer mode + USB debugging on, visible in
+  `adb devices`. (WSL2: attach via `usbipd` or use `adb connect <phone-ip>:5555`.)
+
+```bash
+pnpm install
+pnpm dlx expo prebuild --platform android   # plugin chain → android/ (validated by J9 on 2026-07-07)
+pnpm expo run:android                        # dev build, fakes mode (emulator-friendly)
+EXPO_PUBLIC_TS_REAL_ADAPTERS=1 pnpm expo run:android   # dev build on the REAL adapters
+eas build -p android --profile preview       # shareable release APK (always real adapters)
+```
+
+Known compile-deferred item: the Kotlin sources in `modules/fgs/android` have never been
+compiled (no toolchain on the dev machine) — expect to fix trivial Kotlin/AGP issues on
+the first `expo run:android`. The prebuild-level plugin chain (manifest permissions, FGS
+`<service>` + `connectedDevice` type, NDEF intent filter, expo-modules + RN autolinking
+incl. `modules/fgs`, `react-native-nfc-manager`, WatermelonDB JSI,
+`react-native-get-random-values`) was validated on 2026-07-07.
+
+### The full placement ritual (§1 product flow)
+
+Prerequisite: onboarded, one box registered (label e.g. "Küche"), tags stuck in the box,
+charger cable in the box.
+
+- [ ] **Arm.** Unlock the phone, hold it over a box tag: app foregrounds (or was open),
+      Home shows ARMED for "Küche" (TAG_READ). FGS notification "Time Served läuft –
+      Box: Küche" appears (started while foreground — legal start).
+- [ ] **Start.** Connect the charging cable within the arm window (default 120 s):
+      state flips to ACTIVE. Verify `started_at` is persisted IMMEDIATELY: the session
+      row exists even if you kill the app right after (see kill test below).
+- [ ] **Serve.** Lock the phone, leave it 5+ minutes. No ticking timer anywhere; the
+      FGS notification stays; heartbeats update `last_charging_at` (snapshot via
+      DevHarness in dev-real mode).
+- [ ] **End.** Unplug: session closes with `end_reason=unplug`, duration =
+      unplugged−started (to the second), FGS notification disappears, Home/History/
+      day-night buckets update.
+- [ ] **Arm timeout.** Arm again but do NOT plug in: after `armTimeoutSec` the arm
+      window dies silently (state back to IDLE, FGS stops, nothing persisted).
+- [ ] **No-NFC boot.** Turn NFC off, cold-start the app: no crash, history still
+      renders, a warn is logged (`TagReader failed to start`). Turn NFC back on (reader
+      restart is a J11 UX item — for now relaunch).
+
+### Launch-by-tag
+
+- [ ] **Cold start by tag.** Force-stop the app (`adb shell am force-stop
+      koeln.gebauer.timeserved`). Unlock the phone on the home screen, scan a box tag:
+      the NDEF intent filter launches the app AND the launch intent is drained into a
+      TAG_READ (ARMED for that box, FGS notification up) — no second scan needed.
+- [ ] **Warm scan (backgrounded).** App running but backgrounded: scan → app
+      foregrounds via onNewIntent, TAG_READ arrives through the normal DiscoverTag
+      path. Exactly ONE TAG_READ (launch-intent drain must not double-fire).
+- [ ] **Recents relaunch quirk (accepted).** After a launch-by-tag, kill the process,
+      relaunch from recents: Android may re-deliver the old tag intent → the box re-arms
+      and times out after `armTimeoutSec`. Nothing is persisted in ARMED — acceptable.
+- [ ] **Foreign/unknown tags.** Scan an unknown-but-valid Time Served tag (written by
+      another device): box auto-created with `origin=foreign` + its tag label, counting
+      works, NO dialog (§9.2).
+
+### Kill-process-mid-session → reconciled on relaunch (CLAUDE.md §3)
+
+1. Start a session (ACTIVE, plugged, FGS up). Wait ≥ 2 min (so a heartbeat landed).
+2. Kill the process: `adb shell am force-stop koeln.gebauer.timeserved` (also kills the
+   FGS — worst case).
+3. Unplug the phone while the process is dead. Wait a noticeable interval (e.g. 10 min).
+4. Relaunch the app normally.
+   - [ ] Bootstrap APP_RESUMED reconciliation closes the orphaned session with
+         `end_reason=reconciled` and `ended_at = last_charging_at` (never "now") —
+         the wait interval from step 3 is NOT counted.
+   - [ ] Buckets recomputed; Home/History consistent; no stale FGS notification.
+5. Variant — still charging on relaunch: kill the process but leave the phone plugged
+   in, relaunch.
+   - [ ] With the machine state lost (fresh process = IDLE, no armed box), the open
+         session is closed as `reconciled` per BUILD_V1 §7's rule (open session +
+         `s.box_id !== currentArmedBox`). Re-scan + re-plug starts a new session.
+6. AppState variant: background the app (don't kill), unplug while backgrounded,
+   foreground again.
+   - [ ] APP_RESUMED on AppState 'active' reconciles immediately (no relaunch needed).
+
+### Battery-optimization exemption
+
+The one-time exemption request lives in J11's onboarding (see §5.5 above). For J9 runs
+on aggressive OEMs (Samsung/Xiaomi/OnePlus), record whether the exemption was granted —
+without it the FGS may die mid-session and every session ends via reconciliation
+(shorter by up to one heartbeat interval). That is degraded precision, not data loss.

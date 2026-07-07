@@ -2,26 +2,58 @@
  * COMPOSITION ROOT — THE SWAP SURFACE (JOBS.md J8 → J9/J10).
  *
  * This file is the ONE place that decides which concrete implementations sit
- * behind the AppServices seam (src/ui/services/AppServicesContext.ts). Today —
- * mocked wiring for the emulator:
+ * behind the AppServices seam (src/ui/services/AppServicesContext.ts). J9 wired
+ * the live loop; two adapter modes exist:
  *
- *   - repositories : J3's WatermelonDB repositories on the in-memory LokiJS
- *                    adapter + InMemorySecureStore, seeded with demo fixtures.
+ * REAL (device builds — the live session loop):
+ *   - repositories : WatermelonDB on SQLite (JSI) + expo-secure-store.
+ *   - tag/power/FGS: AndroidTagReader/AndroidTagWriter (nfc-manager),
+ *                    AndroidPowerStateProvider (expo-battery + FGS receiver),
+ *                    AndroidSessionRuntime (modules/fgs). The TagWriter is
+ *                    wrapped so wizard write steps pause the passive reader.
+ *   - launch-by-tag: the manifest NDEF intent filter (plugins/nfc) foregrounds
+ *                    the app; the launch intent is drained once at bootstrap
+ *                    (AndroidTagReader.emitLaunchTag) so a cold start by tag
+ *                    also produces a TAG_READ.
+ *   - APP_RESUMED  : dispatched once at bootstrap and on every AppState
+ *                    'active' — reconciliation runs in-engine (CLAUDE.md §3).
+ *
+ * FAKES (emulator/dev harness):
+ *   - repositories : in-memory LokiJS + InMemorySecureStore, demo fixtures.
  *   - tag/power/FGS: the J4/J5 fakes (emulators have no NFC / plug events).
- *   - groups       : in-memory stub gateway with stub crypto (stubGroups.ts).
- *   - clock        : OffsetClock (dev-harness time travel).
  *
- * J9 (live loop): swap createTestDatabase() → createDatabase(createSQLiteAdapter()),
- * InMemorySecureStore → ExpoSecureKeyValueStore, the fakes → AndroidTagReader/
- * AndroidTagWriter/AndroidPowerStateProvider/AndroidSessionRuntime, and revisit
- * the provisional tag/ARM_TIMEOUT wiring in wiring.ts.
+ * ADAPTER-MODE SWITCH (J9, documented per JOBS.md):
+ *   - Release builds (!__DEV__) ALWAYS use the real adapters.
+ *   - Dev builds default to FAKES (in-memory data + demo seed) so the
+ *     DevHarness screen keeps driving the full wiring on an emulator.
+ *   - To run a DEV build against the real adapters (device smoke tests before
+ *     a release build), set the bundle-time env flag:
+ *         EXPO_PUBLIC_TS_REAL_ADAPTERS=1 pnpm expo run:android
+ *     In that mode the DevHarness stays usable in degraded form: the simulate
+ *     buttons dispatch the equivalent domain events directly (tag reads go
+ *     through the real §9.2 resolution), and presentTag is a no-op because the
+ *     wizard talks to real NFC hardware.
+ *
  * J10 (sync): swap createStubGroupsGateway → the PocketBase gateway (J6 crypto).
  * Everything else (engine, hooks, screens, wiring helpers) stays untouched.
  */
-import { createRepositories, InMemorySecureStore, seedDemoData } from '../data';
+import { AppState, Platform } from 'react-native';
+
+import {
+  createDatabase,
+  createRepositories,
+  InMemorySecureStore,
+  seedDemoData,
+} from '../data';
+import { createSQLiteAdapter } from '../data/adapters/sqlite';
+import { ExpoSecureKeyValueStore } from '../data/secure/ExpoSecureKeyValueStore';
+import type { SecureKeyValueStore } from '../data/secure/SecureKeyValueStore';
 import { createTestDatabase } from '../data/testing';
 import { createSessionEngine } from '../domain/session';
 import type { BoxId, BucketConfig, DomainEvent } from '../domain/types';
+import { AndroidPowerStateProvider } from '../platform/android/AndroidPowerStateProvider';
+import { AndroidSessionRuntime } from '../platform/android/AndroidSessionRuntime';
+import { AndroidTagReader, AndroidTagWriter } from '../platform/android/nfc';
 import {
   FakePowerStateProvider,
   FakeSessionRuntime,
@@ -33,6 +65,7 @@ import type {
   AppServices,
   DevControls,
   DevTagKind,
+  EngineHandle,
   OnboardingStore,
 } from '../ui/services/AppServicesContext';
 import { createSettingsStore, deviceTimeZone } from './settingsStore';
@@ -40,6 +73,8 @@ import { createStubGroupsGateway } from './stubGroups';
 import {
   createChangeNotifier,
   createEngineHandle,
+  createExclusiveTagWriter,
+  createTagPayloadHandler,
   createUuidSource,
   OffsetClock,
   wireAdapters,
@@ -47,27 +82,50 @@ import {
 
 const ONBOARDING_KEY = 'ts.ui.onboarded';
 
+type AdapterMode = 'real' | 'fakes';
+
+/** See the header — release always real; dev defaults to fakes unless flagged. */
+function resolveAdapterMode(): AdapterMode {
+  if (!__DEV__) return 'real';
+  return process.env.EXPO_PUBLIC_TS_REAL_ADAPTERS === '1' ? 'real' : 'fakes';
+}
+
 export async function createAppServices(): Promise<AppServices> {
+  const mode = resolveAdapterMode();
+  if (mode === 'real' && Platform.OS !== 'android') {
+    // V1 ships Android only; the iOS adapters are stubs (CLAUDE.md §2).
+    throw new Error(
+      `Time Served V1 has real adapters for Android only (got Platform.OS=${Platform.OS}).`,
+    );
+  }
+
   const clock = new OffsetClock();
   const ids = createUuidSource();
   const events = createChangeNotifier();
   const timeZone = deviceTimeZone();
 
-  // --- Data layer (J3) on in-memory adapters — J9 swaps these two lines. ---
-  const secureStore = new InMemorySecureStore();
+  // --- Data layer (J3): SQLite + Keystore on device, in-memory for the harness.
+  const secureStore: SecureKeyValueStore =
+    mode === 'real' ? new ExpoSecureKeyValueStore() : new InMemorySecureStore();
   const repositories = createRepositories({
-    database: createTestDatabase(),
+    database:
+      mode === 'real' ? createDatabase(createSQLiteAdapter()) : createTestDatabase(),
     secureStore,
     clock,
   });
 
   const settings = await createSettingsStore(secureStore, timeZone);
 
-  // --- Platform seams: FAKES for the emulator — J9 swaps these. ---
-  const tagReader = new FakeTagReader();
-  const tagWriter = new FakeTagWriter();
-  const power = new FakePowerStateProvider();
-  const runtime = new FakeSessionRuntime();
+  // --- Platform seams (J4/J5 adapters, or their fakes for the emulator).
+  const tagReader = mode === 'real' ? new AndroidTagReader() : new FakeTagReader();
+  const power =
+    mode === 'real' ? new AndroidPowerStateProvider() : new FakePowerStateProvider();
+  const runtime = mode === 'real' ? new AndroidSessionRuntime() : new FakeSessionRuntime();
+  // Real mode: wizard write steps must run with the passive reader stopped
+  // (AndroidTagWriter header); the wrapper stops/restarts it around each step.
+  const fakeTagWriter = mode === 'fakes' ? new FakeTagWriter() : undefined;
+  const tagWriter =
+    fakeTagWriter ?? createExclusiveTagWriter(new AndroidTagWriter(), tagReader);
 
   // Live view over the settings so tunable changes reach the engine.
   const bucketConfig: BucketConfig = {
@@ -100,7 +158,14 @@ export async function createAppServices(): Promise<AppServices> {
     clock,
     armTimeoutSec: () => settings.get().armTimeoutSec,
   });
-  await tagReader.start();
+
+  // NFC unavailable/disabled must not block bootstrap: history/leaderboard
+  // still work; J11's onboarding/hardening owns the "enable NFC" UX + retry.
+  try {
+    await tagReader.start();
+  } catch (error) {
+    console.warn('[services] TagReader failed to start (NFC unavailable?)', error);
+  }
 
   const groups = createStubGroupsGateway({ repositories, clock, ids, timeZone });
 
@@ -116,46 +181,45 @@ export async function createAppServices(): Promise<AppServices> {
     },
   };
 
-  if (__DEV__) {
-    // Fresh in-memory DB every launch → always reseed the demo dataset, then
-    // reconcile: the fixture's open session is no longer charging, so it is
-    // closed honestly as 'reconciled' and today's bucket gets recomputed.
+  if (mode === 'fakes') {
+    // Fresh in-memory DB every launch → always reseed the demo dataset before
+    // the initial reconciliation below closes the fixture's stale open session.
     await seedDemoData(repositories, { now: clock.now() });
-    await engineHandle.dispatch({ type: 'APP_RESUMED', at: clock.now() });
+  }
+
+  // Launch reconciliation (BUILD_V1 §7 — mandatory on EVERY launch): any open
+  // session whose phone is no longer charging is closed from persisted state.
+  await engineHandle.dispatch({ type: 'APP_RESUMED', at: clock.now() });
+
+  // Foreground reconciliation: every return to 'active' re-runs it in-engine.
+  AppState.addEventListener('change', (appState) => {
+    if (appState === 'active') {
+      void engineHandle.dispatch({ type: 'APP_RESUMED', at: clock.now() });
+    }
+  });
+
+  // Launch-by-tag (§8.1): a home-screen scan cold-started us via the NDEF
+  // intent filter — drain the launch intent so it produces a TAG_READ too.
+  // Runs AFTER reconciliation so a stale open session is closed first, and
+  // while the activity is foreground, so the engine's FGS start is legal.
+  if (tagReader instanceof AndroidTagReader) {
+    await tagReader.emitLaunchTag();
   }
 
   const dispatch = (event: DomainEvent) => void engineHandle.dispatch(event);
   const dev: DevControls | undefined = __DEV__
-    ? {
-        simulateTagRead(boxId: BoxId, label: string) {
-          tagReader.simulateTag({ boxUuid: boxId, label, version: 1 });
-        },
-        simulateChargingStarted: () => power.simulateChargingStarted(clock.now()),
-        simulateChargingStopped: () => power.simulateChargingStopped(clock.now()),
-        simulateHeartbeat: () => power.simulateHeartbeat(clock.now()),
-        fireAppResumed: () => dispatch({ type: 'APP_RESUMED', at: clock.now() }),
-        fireArmTimeout: () => dispatch({ type: 'ARM_TIMEOUT', at: clock.now() }),
-        presentTag(kind: DevTagKind, boxUuid?: string, label?: string) {
-          tagWriter.presentTag(devTagState(kind, boxUuid, label));
-        },
-        advanceClock(ms: number) {
-          clock.advance(ms);
-          events.notify();
-        },
-        resetClock() {
-          clock.reset();
-          events.notify();
-        },
-        async snapshot() {
-          return {
-            machineState: engineHandle.getState(),
-            openSessions: await repositories.sessions.findOpen(),
-            dirtyBuckets: await repositories.dayBuckets.findDirty(),
-            clockNow: clock.now(),
-            clockOffsetMs: clock.offset,
-          };
-        },
-      }
+    ? mode === 'fakes'
+      ? createFakeDevControls({
+          tagReader: tagReader as FakeTagReader,
+          tagWriter: fakeTagWriter as FakeTagWriter,
+          power: power as FakePowerStateProvider,
+          clock,
+          events,
+          engineHandle,
+          repositories,
+          dispatch,
+        })
+      : createRealDevControls({ clock, events, engineHandle, repositories })
     : undefined;
 
   return {
@@ -169,6 +233,98 @@ export async function createAppServices(): Promise<AppServices> {
     events,
     onboarding,
     dev,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dev controls (DEBUG builds only)
+// ---------------------------------------------------------------------------
+
+interface DevControlsCommon {
+  readonly clock: OffsetClock;
+  readonly events: ReturnType<typeof createChangeNotifier>;
+  readonly engineHandle: EngineHandle;
+  readonly repositories: ReturnType<typeof createRepositories>;
+}
+
+function createDevControlsBase(options: DevControlsCommon) {
+  const { clock, events, engineHandle, repositories } = options;
+  return {
+    fireAppResumed: () =>
+      void engineHandle.dispatch({ type: 'APP_RESUMED', at: clock.now() }),
+    fireArmTimeout: () =>
+      void engineHandle.dispatch({ type: 'ARM_TIMEOUT', at: clock.now() }),
+    advanceClock(ms: number) {
+      clock.advance(ms);
+      events.notify();
+    },
+    resetClock() {
+      clock.reset();
+      events.notify();
+    },
+    async snapshot() {
+      return {
+        machineState: engineHandle.getState(),
+        openSessions: await repositories.sessions.findOpen(),
+        dirtyBuckets: await repositories.dayBuckets.findDirty(),
+        clockNow: clock.now(),
+        clockOffsetMs: clock.offset,
+      };
+    },
+  };
+}
+
+/** Harness drives the FAKES — exercises the exact adapter→engine wiring. */
+function createFakeDevControls(
+  options: DevControlsCommon & {
+    readonly tagReader: FakeTagReader;
+    readonly tagWriter: FakeTagWriter;
+    readonly power: FakePowerStateProvider;
+    readonly dispatch: (event: DomainEvent) => void;
+  },
+): DevControls {
+  const { tagReader, tagWriter, power, clock } = options;
+  return {
+    ...createDevControlsBase(options),
+    simulateTagRead(boxId: BoxId, label: string) {
+      tagReader.simulateTag({ boxUuid: boxId, label, version: 1 });
+    },
+    simulateChargingStarted: () => power.simulateChargingStarted(clock.now()),
+    simulateChargingStopped: () => power.simulateChargingStopped(clock.now()),
+    simulateHeartbeat: () => power.simulateHeartbeat(clock.now()),
+    presentTag(kind: DevTagKind, boxUuid?: string, label?: string) {
+      tagWriter.presentTag(devTagState(kind, boxUuid, label));
+    },
+  };
+}
+
+/**
+ * Degraded harness for a DEV build on REAL adapters: real NFC/power events flow
+ * anyway, so the simulate buttons inject the equivalent domain events directly
+ * (tag reads through the real §9.2 resolution). presentTag cannot conjure
+ * physical hardware — no-op with a warning.
+ */
+function createRealDevControls(options: DevControlsCommon): DevControls {
+  const { clock, engineHandle, repositories } = options;
+  const handleTagPayload = createTagPayloadHandler({
+    engine: engineHandle,
+    boxes: repositories.boxes,
+    clock,
+  });
+  return {
+    ...createDevControlsBase(options),
+    simulateTagRead(boxId: BoxId, label: string) {
+      void handleTagPayload({ boxUuid: boxId, label, version: 1 });
+    },
+    simulateChargingStarted: () =>
+      void engineHandle.dispatch({ type: 'CHARGING_STARTED', at: clock.now() }),
+    simulateChargingStopped: () =>
+      void engineHandle.dispatch({ type: 'CHARGING_STOPPED', at: clock.now() }),
+    simulateHeartbeat: () =>
+      void engineHandle.dispatch({ type: 'CHARGING_HEARTBEAT', at: clock.now() }),
+    presentTag() {
+      console.warn('[dev] presentTag is fakes-only; real mode uses physical tags.');
+    },
   };
 }
 

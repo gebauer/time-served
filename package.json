@@ -25,6 +25,7 @@
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",
     "react-native": "0.86.0",
+    "react-native-get-random-values": "^2.0.0",
     "react-native-nfc-manager": "^3.17.2",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2"
