@@ -61,6 +61,15 @@ export default function App() {
   // J10: route invite links to the GroupJoin screen. Links arriving before
   // navigation is ready (cold start, onboarding) are parked and flushed via
   // the container's onReady below.
+  //
+  // STARTUP ORDER vs. J9's bootstrap: this effect only runs once `services`
+  // resolves, i.e. AFTER createAppServices completed the launch APP_RESUMED
+  // reconciliation, the NDEF launch-tag drain and the J10 sync bootstrap —
+  // an invite can therefore never race the session-loop startup. A cold start
+  // BY TAG delivers the tag URI (timeserved://box/…) as the initial URL too;
+  // parseInvite() rejects it (not an invite), so the two launch paths cannot
+  // cross-fire: the tag intent is handled by AndroidTagReader.emitLaunchTag,
+  // invite URLs by this handler.
   const pendingInviteRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (services === undefined) return;

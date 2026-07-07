@@ -85,6 +85,7 @@ listener + FGS receiver) and normalizes per subscription
 No signature change — behavioral clarification only. Affects J9 (consumes the stream;
 may map events 1:1 onto domain events without extra dedupe) and the iOS adapter later
 (should follow the same rules). **Accepted** (coordinator, 2026-07-07).
+
 ### #8 — 2026-07-07 — PROPOSAL (J6): noble crypto libs instead of libsodium
 
 JOBS.md J6 suggests libsodium (`libsodium-wrappers` / `react-native-libsodium`).
@@ -130,7 +131,33 @@ ONE file — `src/app/services.ts` — which is the designated swap surface:
 Affects J9/J10 (implement against these seams), no other jobs. **Accepted**
 (coordinator, 2026-07-07).
 
-### #10 — 2026-07-07 — PROPOSAL (J10): additional sync-side secure-store entries
+### #10 — 2026-07-07 — PROPOSAL (J9): additive `AndroidTagReader.emitLaunchTag()` for launch-by-tag
+
+The `TagReader` contract file is UNCHANGED — this is an additive method on J4's
+`AndroidTagReader` class only, logged because it extends another job's adapter. When a
+home-screen scan cold-starts the app through the manifest NDEF intent filter
+(`plugins/nfc`), reader mode was not yet registered, so the tag arrives on the
+activity's launch intent instead of as a DiscoverTag event. `emitLaunchTag()` drains
+that intent once at bootstrap via nfc-manager's `getLaunchTagEvent()` and pushes the
+tag through the EXACT same §9.2 decode + dedupe + emit path as a reader-mode read (the
+shared dedupe window also prevents a double TAG_READ when reader mode re-detects the
+tag right after). Warm scans (process alive, backgrounded) need nothing: nfc-manager's
+`onNewIntent` already delivers those as DiscoverTag events. Called only by the J9
+composition root (`src/app/services.ts`), after the bootstrap APP_RESUMED
+reconciliation. Known quirk (documented in the method + DEVICE_TESTS §J9): a recents
+relaunch after process death can re-deliver the old tag intent → re-arms the box, which
+times out harmlessly (ARMED persists nothing). Affects the iOS adapter later (its
+equivalent is the `expo-linking` URL launch path). Fakes/tests unaffected.
+
+Also J9, no contract impact, recorded for coordination: the dev/real **adapter-mode
+switch** lives in `src/app/services.ts` — release builds always compose the real
+adapters (SQLite/Keystore/Android seams); dev builds default to the J4/J5 fakes +
+in-memory data (DevHarness path) unless bundled with `EXPO_PUBLIC_TS_REAL_ADAPTERS=1`.
+Wizard write steps run with the passive reader paused via a `TagWriter` wrapper
+(`createExclusiveTagWriter` in `src/app/wiring.ts`), per the AndroidTagWriter header's
+instruction to J9.
+
+### #11 — 2026-07-07 — PROPOSAL (J10): additional sync-side secure-store entries
 
 The `DeviceCredentialStore` contract stores `{userId, token}` — but the device-auth
 flow (server/README.md §3) also needs the client-generated `user_uuid` and the random
@@ -149,7 +176,7 @@ No interface signature changes; `DeviceCredentialStore` keeps its shape. Affects
 nobody else (keys live in J10's `ts.sync.*` prefix; J3's stores use `ts.credential` /
 `ts.groupkey.*` / `ts.groupkeys`).
 
-### #11 — 2026-07-07 — J10 decision: foreground-only seal triggers in V1
+### #12 — 2026-07-07 — J10 decision: foreground-only seal triggers in V1
 
 JOBS.md J10 suggests WorkManager via `expo-background-task` for the ~12:00 daily seal.
 V1 ships FOREGROUND-ONLY triggers instead (`src/app/sync/sealTriggers.ts`): app
@@ -160,4 +187,7 @@ the server's unique index, and a WorkManager task is itself OS-discretionary on
 aggressive OEMs, so the added native module + config plugin buys little. Sync-off
 semantics clarified with it: sealed means UPLOADED — with the sync toggle off nothing
 is sealed locally either; past days stay editable until sync is re-enabled (Settings
-copy updated accordingly). Revisit in J11 if background sealing becomes a requirement.
+copy updated accordingly). Bootstrap ordering (composition root): the seal triggers
+attach AFTER the launch APP_RESUMED reconciliation and the launch-tag drain, so the
+first run seals reconciled bucket totals. Revisit in J11 if background sealing
+becomes a requirement.
