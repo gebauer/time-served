@@ -60,3 +60,28 @@ recompute. No signature change — behavioral clarification only. Affects J2
 (recompute may see zeroed dirty buckets it hasn't computed yet — it overwrites
 them via `upsert` anyway) and J10 (none expected). **Accepted** (coordinator,
 2026-07-07): this is the desired semantic.
+
+### #7 — 2026-07-07 — PROPOSAL (J5): `PowerStateProvider` stream normalization semantics
+
+The contract promises a clean event stream but does not pin down edge cases. J5's
+`AndroidPowerStateProvider` merges two overlapping sources (expo-battery foreground
+listener + FGS receiver) and normalizes per subscription
+(`src/platform/android/normalizePowerEvents.ts`):
+
+- Duplicate `CHARGING_STARTED` / `CHARGING_STOPPED` are dropped — consumers never see
+  the same edge twice in a row (e.g. an unplug observed by both sources emits ONE
+  `CHARGING_STOPPED`).
+- From the initial unknown state, a first `CHARGING_STOPPED` **is** emitted (a late
+  subscriber must still hear the unplug).
+- `CHARGING_HEARTBEAT` always passes through and does **not** affect dedupe state, so
+  a heartbeat arriving before the plug-in (FGS still running from a previous session)
+  cannot swallow the `CHARGING_STARTED` the session machine needs.
+- A native heartbeat with `charging=false` is dropped (the unplug is reported by the
+  dedicated stop events; heartbeats exist only to feed `last_charging_at`).
+- Timestamps pass through unchanged; events synthesized from expo-battery (which has
+  no timestamp) use JS `Date.now()` at observation.
+- `BatteryState.FULL` counts as charging (power-connection state, CLAUDE.md §4).
+
+No signature change — behavioral clarification only. Affects J9 (consumes the stream;
+may map events 1:1 onto domain events without extra dedupe) and the iOS adapter later
+(should follow the same rules).

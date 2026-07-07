@@ -1,0 +1,27 @@
+// Local Expo module (autolinked from modules/ — no package.json needed).
+// Uses the expo-module-gradle-plugin shipped with expo-modules-core (SDK 52+
+// convention; see https://docs.expo.dev/modules/get-started/). If a future SDK
+// drops the plugin, fall back to `apply from: ExpoModulesCorePlugin.gradle` +
+// applyKotlinExpoModulesCorePlugin()/useCoreDependencies().
+apply plugin: 'com.android.library'
+apply plugin: 'expo-module-gradle-plugin'
+
+group = 'koeln.gebauer.timeserved.fgs'
+version = '0.1.0'
+
+android {
+  namespace "koeln.gebauer.timeserved.fgs"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  // NotificationCompat / ContextCompat. Gradle resolves to the highest version
+  // requested across the app; this is a floor, not a pin.
+  implementation 'androidx.core:core-ktx:1.13.1'
+}

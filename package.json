@@ -15,6 +15,7 @@
   "dependencies": {
     "@nozbe/watermelondb": "^0.28.0",
     "expo": "~57.0.2",
+    "expo-battery": "~57.0.0",
     "expo-secure-store": "^57.0.0",
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",
